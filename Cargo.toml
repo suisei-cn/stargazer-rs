@@ -7,6 +7,9 @@ edition = "2018"
 
 [dependencies]
 actix = "*"
+actix-web = "*"
+actix-web-actors = "*"
 anyhow = "*"
 serde = { version = "*",  features = ["derive"] }
 serde_json = "*"
+log = "*"

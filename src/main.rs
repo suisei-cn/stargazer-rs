@@ -1,6 +1,9 @@
+mod app;
 mod lib;
-use crate::lib::App;
+
+use app::App;
 
 fn main() {
+    let app = App::new();
     println!("Hello, world!");
 }

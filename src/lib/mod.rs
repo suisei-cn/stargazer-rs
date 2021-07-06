@@ -1,19 +1,13 @@
-#![feature(associated_type_bounds)]
-
-mod app;
-mod client;
-mod dispatcher;
-mod event;
+mod api;
+mod config;
+mod event_source;
+mod model;
+mod mongo;
 mod util;
 mod websocket;
 
-pub use app::*;
-pub use client::*;
-pub use dispatcher::*;
-pub use event::*;
+pub use event_source::*;
+pub use model::*;
+pub use mongo::*;
 pub use util::*;
-
-// TODO: add more prelude staff
-pub mod prelude {
-    use super::app::App;
-}
+pub use websocket::*;
