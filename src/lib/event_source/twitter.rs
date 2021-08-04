@@ -1,6 +1,7 @@
 use actix::prelude::*;
 
-use crate::lib::{Update, Vtuber};
+use crate::error::Result;
+use crate::{Update, Vtuber};
 
 pub struct TwitterActor {}
 
@@ -14,5 +15,9 @@ impl Actor for TwitterActor {
 }
 
 impl Handler<Update<Vtuber>> for TwitterActor {
-    fn handle(&mut self, msg: Update<Vtuber>, ctx: &mut Self::Context) -> Self::Result {}
+    type Result = Result<()>;
+
+    fn handle(&mut self, msg: Update<Vtuber>, ctx: &mut Self::Context) -> Self::Result {
+        todo!()
+    }
 }

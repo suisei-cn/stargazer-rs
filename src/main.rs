@@ -1,7 +1,6 @@
-mod app;
-mod lib;
-
 use app::App;
+
+mod app;
 
 fn main() {
     let app = App::new();

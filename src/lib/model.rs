@@ -1,9 +1,10 @@
-use actix::{Handler, Message};
-use anyhow::Result;
+use actix::Message;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+use crate::error::Result;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Vtuber {
     key: String,
     youtube: Option<String>,
@@ -11,16 +12,16 @@ pub struct Vtuber {
     bilibili: Option<usize>,
 }
 
-#[derive(Message, Serialize, Deserialize, Clone, Copy, Debug)]
+#[derive(Message, Serialize, Deserialize, Clone, Debug)]
 #[rtype(result = "Result<()>")]
 pub struct Update<T> {
     old: T,
     new: T,
 }
 
-#[derive(Message, Serialize, Deserialize, Copy, Debug)]
+#[derive(Message, Serialize, Deserialize, Debug)]
 #[rtype(result = "Result<()>")]
-pub struct Event<T: Serialize + Deserialize + Send> {
+pub struct Event<T> {
     event_type: String,
     data: T,
     vtuber: Vtuber,

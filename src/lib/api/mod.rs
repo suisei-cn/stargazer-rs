@@ -1,3 +1,3 @@
-mod rest;
-
 pub use rest::*;
+
+mod rest;
