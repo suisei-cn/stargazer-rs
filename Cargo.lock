@@ -577,12 +577,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "frunk_core"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1246cf43ec80bf8b2505b5c360b8fb999c97dabd17dbb604d85558d5cbc25482"
-
-[[package]]
 name = "futures"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1404,7 +1398,6 @@ dependencies = [
  "clap",
  "config",
  "dirs",
- "frunk_core",
  "futures",
  "log",
  "serde 1.0.127",

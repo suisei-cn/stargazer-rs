@@ -8,6 +8,8 @@ pub enum Error {
     Json(#[from] serde_json::Error),
     #[error("config: {0}")]
     Config(#[from] ConfigError),
+    #[error("context: no such worker in context")]
+    Context,
 }
 
 impl From<config::ConfigError> for Error {
