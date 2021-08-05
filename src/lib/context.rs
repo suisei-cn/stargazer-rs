@@ -99,7 +99,7 @@ impl InstanceContext {
         AddrT: 'static,
         Output: Send,
     {
-        let a = futures::future::join_all(
+        futures::future::join_all(
             self.arbiters
                 .iter()
                 .map(|arbiter| (arbiter, msg.clone()))
@@ -110,13 +110,13 @@ impl InstanceContext {
                     )
                 }),
         )
-        .await;
-        a.into_iter()
-            .map(|(id, output)| match (id, output) {
-                (Ok(id), Ok(output)) => Ok((id, output)),
-                (Err(e), _) => Err(e),
-                (_, Err(e)) => Err(e),
-            })
-            .collect::<Result<Vec<_>>>()
+        .await
+        .into_iter()
+        .map(|(id, output)| match (id, output) {
+            (Ok(id), Ok(output)) => Ok((id, output)),
+            (Err(e), _) => Err(e),
+            (_, Err(e)) => Err(e),
+        })
+        .collect()
     }
 }
