@@ -3,6 +3,8 @@ pub use event_source::*;
 pub use model::*;
 pub use util::*;
 
+pub use crate::config::*;
+
 mod api;
 mod config;
 mod context;
