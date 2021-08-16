@@ -17,7 +17,7 @@ path = "src/main.rs"
 actix = "0.12"
 actix-web = "4.0.0-beta.8"
 anyhow = "1.0"
-clap = "3.0.0-beta.2"
+clap = "3.0.0-beta.4"
 config = { version = "0.11", features = ["toml", "json"], default-features = true }
 dirs = "3.0"
 futures = "0.3"
