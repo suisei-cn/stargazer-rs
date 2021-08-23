@@ -1,5 +1,3 @@
-use actix::prelude::*;
-
 pub struct App {}
 
 /// App is the ultimate instance to interact with

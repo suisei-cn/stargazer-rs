@@ -23,6 +23,15 @@ pub struct ArbiterContext {
 }
 
 impl ArbiterContext {
+    pub fn instance_id(&self) -> Uuid {
+        self.instance_id
+    }
+    pub fn arbiter_id(&self) -> Uuid {
+        self.arbiter_id
+    }
+}
+
+impl ArbiterContext {
     pub fn new(instance_id: Uuid) -> Self {
         Self {
             instance_id,
