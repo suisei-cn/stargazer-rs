@@ -53,6 +53,46 @@ mod arb_handler {
     }
 }
 
+mod killer {
+    use std::time::Duration;
+
+    use actix::{AsyncContext, System, SystemService};
+    use tokio::sync::mpsc::unbounded_channel;
+    use tokio::time::{sleep, timeout};
+
+    use crate::server::killer::Kill;
+    use crate::KillerActor;
+
+    #[test]
+    fn must_kill_system() {
+        let sys = System::new();
+        let (tx, mut rx) = unbounded_channel();
+
+        sys.block_on(async {
+            // clone the channel so that it won't be closed
+            let tx = tx.clone();
+
+            actix::spawn(async move {
+                sleep(Duration::from_millis(100)).await;
+                // Killer failed to reap this system, notify main thread
+                tx.send(());
+                System::current().stop(); // cleanup
+            });
+
+            let addr = KillerActor::from_registry();
+            addr.do_send(Kill::new(true));
+        });
+        sys.run();
+
+        System::new().block_on(async {
+            // Here we spawned a future and use recv instead of blocking_recv
+            // because we don't want the test stuck forever if it's failed.
+            let fut = timeout(Duration::from_millis(150), rx.recv());
+            assert!(dbg!(fut.await).is_err(), "system is not killed");
+        });
+    }
+}
+
 mod watchdog {
     use std::time::Duration;
 
@@ -65,14 +105,16 @@ mod watchdog {
     #[test]
     fn must_send_when_stopped() {
         let sys = System::new();
-        let (tx, mut rx) = unbounded_channel::<()>();
+        let (tx, mut rx) = unbounded_channel();
         sys.block_on(async {
-            WatchdogActor::start(tx.clone());
-            System::current().stop();
+            WatchdogActor::start(tx.clone()); // start watchdog
+            System::current().stop(); // trigger watchdog
         });
-        sys.run();
+        sys.run(); // join system
 
         System::new().block_on(async {
+            // Here we spawned a future and use recv instead of blocking_recv
+            // because we don't want the test stuck forever if it's failed.
             let fut = timeout(Duration::from_millis(100), rx.recv());
             assert!(fut.await.is_ok(), "watchdog failed to send die signal");
         });
