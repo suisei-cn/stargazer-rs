@@ -64,6 +64,7 @@ where
     SF: 'static + FnOnce(&mut ServiceConfig),
 {
     factory: F,
+    workers: usize,
     instance_ctx: Arc<RwLock<InstanceContext>>,
 }
 
@@ -79,8 +80,17 @@ where
         let ctx = InstanceContext::new();
         Server {
             factory,
+            workers: num_cpus::get(),
             instance_ctx: Arc::new(RwLock::new(ctx)),
         }
+    }
+
+    /// Set number of workers to start.
+    ///
+    /// By default, server uses number of available logical CPU as thread count.
+    pub fn workers(mut self, num: usize) -> Self {
+        self.workers = num;
+        self
     }
 }
 
@@ -91,17 +101,15 @@ where
 {
     pub fn run(self, mode: ServerMode) -> Result<ServerHandler> {
         let instance_id = self.instance_ctx.read().id();
+        let instance_ctx = self.instance_ctx;
+        let factory = self.factory;
 
         match mode {
             ServerMode::NoHTTP => {
-                let (tx, rx) = unbounded_channel();
+                let (stop_tx, stop_rx) = unbounded_channel();
 
-                let cpus = num_cpus::get();
-                for _ in 0..cpus {
-                    let instance_ctx = self.instance_ctx.clone();
-                    let factory = self.factory.clone();
-
-                    let tx = tx.clone();
+                let arb_factory = move || {
+                    let tx = stop_tx.clone();
 
                     let arb = Arbiter::new();
                     arb.spawn_fn(move || {
@@ -109,24 +117,28 @@ where
                         WatchdogActor::start(tx);
                         instance_ctx.write().register(ctx);
                     });
+                };
+                for _ in 0..self.workers {
+                    (arb_factory.clone())()
                 }
 
                 KillerActor::from_registry();
-                Ok(ServerHandler::NoHTTP(ArbiterHandler::new(cpus, rx)))
+                Ok(ServerHandler::NoHTTP(ArbiterHandler::new(
+                    self.workers,
+                    stop_rx,
+                )))
             }
             ServerMode::HTTP { port } => {
-                let instance_ctx = self.instance_ctx;
-                let factory = self.factory;
-
                 let srv = HttpServer::new(move || {
                     let (ctx, http_services) = factory(instance_id);
                     instance_ctx.write().register(ctx.clone());
                     App::new()
                         .wrap(Logger::default())
                         .app_data(Data::new(ctx))
-                        .app_data(Data::from(Arc::new(instance_ctx.read().clone())))
+                        .app_data(Data::new(instance_ctx.read().clone()))
                         .configure(http_services)
                 })
+                .workers(self.workers)
                 .bind(port)
                 .unwrap()
                 .run();
