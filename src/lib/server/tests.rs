@@ -52,3 +52,29 @@ mod arb_handler {
         );
     }
 }
+
+mod watchdog {
+    use std::time::Duration;
+
+    use actix::System;
+    use tokio::sync::mpsc::unbounded_channel;
+    use tokio::time::timeout;
+
+    use crate::server::watchdog::WatchdogActor;
+
+    #[test]
+    fn must_send_when_stopped() {
+        let sys = System::new();
+        let (tx, mut rx) = unbounded_channel::<()>();
+        sys.block_on(async {
+            WatchdogActor::start(tx.clone());
+            System::current().stop();
+        });
+        sys.run();
+
+        System::new().block_on(async {
+            let fut = timeout(Duration::from_millis(100), rx.recv());
+            assert!(fut.await.is_ok(), "watchdog failed to send die signal");
+        });
+    }
+}
