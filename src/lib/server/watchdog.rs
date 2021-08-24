@@ -15,7 +15,10 @@ impl WatchdogActor {
         let act = Self(tx);
         let addr = act.start();
         LOCAL_WATCHDOG.with(|f| {
-            assert!(f.borrow().is_none(), "cannot run two watchdog on the same arbiter");
+            assert!(
+                f.borrow().is_none(),
+                "cannot run two watchdogs on the same arbiter"
+            );
             *f.borrow_mut() = Some(addr)
         });
     }

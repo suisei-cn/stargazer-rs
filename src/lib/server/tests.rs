@@ -84,16 +84,21 @@ mod killer {
         });
         sys.run(); // join system
 
-        System::new().block_on(async {
+        let sys = System::new();
+        sys.block_on(async {
             // Here we spawned a future and use recv instead of blocking_recv
             // because we don't want the test stuck forever if it's failed.
             let fut = timeout(Duration::from_millis(150), rx.recv());
             assert!(fut.await.is_err(), "system is not killed");
+            System::current().stop();
         });
+        sys.run();
     }
 }
 
 mod watchdog {
+    use std::mem;
+    use std::thread;
     use std::time::Duration;
 
     use actix::System;
@@ -104,30 +109,54 @@ mod watchdog {
 
     #[test]
     fn must_send_when_stopped() {
-        let sys = System::new();
-        let (tx, mut rx) = unbounded_channel();
-        sys.block_on(async {
-            WatchdogActor::start(tx.clone()); // start watchdog
-            System::current().stop(); // trigger watchdog
-        });
-        sys.run(); // join system
+        // spawn a new thread to avoid polluting thread local storage
+        thread::spawn(|| {
+            let sys = System::new();
+            let (tx, mut rx) = unbounded_channel();
+            sys.block_on(async {
+                WatchdogActor::start(tx.clone()); // start watchdog
+                System::current().stop(); // trigger watchdog
+            });
+            sys.run(); // join system
 
-        System::new().block_on(async {
-            // Here we spawned a future and use recv instead of blocking_recv
-            // because we don't want the test stuck forever if it's failed.
-            let fut = timeout(Duration::from_millis(100), rx.recv());
-            assert!(fut.await.is_ok(), "watchdog failed to send die signal");
-        });
+            let sys = System::new();
+            sys.block_on(async {
+                // Here we spawned a future and use recv instead of blocking_recv
+                // because we don't want the test stuck forever if it's failed.
+                let fut = timeout(Duration::from_millis(100), rx.recv());
+                assert!(fut.await.is_ok(), "watchdog failed to send die signal");
+                System::current().stop();
+            });
+            sys.run();
+        })
+        .join()
+        .unwrap();
     }
 
-    #[actix::test]
-    #[should_panic]
-    async fn must_not_create_multiple_watchdog() {
-        for _ in 0..3 {
-            let (tx, rx) = unbounded_channel();
-            // leak rx so that the channel won't be closed causing unexpected panics
-            Box::leak(Box::new(rx));
-            WatchdogActor::start(tx);
+    #[test]
+    fn must_not_create_multiple_watchdog() {
+        // spawn a new thread to avoid polluting thread local storage
+        if let Err(e) = thread::spawn(|| {
+            let sys = System::new();
+            sys.block_on(async {
+                for _ in 0..2 {
+                    let (tx, rx) = unbounded_channel();
+                    // leak rx so that the channel won't be closed causing unexpected panics
+                    mem::forget(rx);
+                    WatchdogActor::start(tx);
+                }
+                System::current().stop()
+            });
+            sys.run()
+        })
+        .join()
+        {
+            assert_eq!(
+                e.downcast_ref::<&'static str>().expect("unexpected panic"),
+                &"cannot run two watchdogs on the same arbiter"
+            );
+        } else {
+            panic!("multiple watchdog is created");
         }
     }
 }
