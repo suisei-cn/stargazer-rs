@@ -27,6 +27,6 @@ impl WatchdogActor {
 impl Actor for WatchdogActor {
     type Context = Context<Self>;
     fn stopped(&mut self, _ctx: &mut Self::Context) {
-        self.0.send(()).unwrap();
+        let _ = self.0.send(());
     }
 }
