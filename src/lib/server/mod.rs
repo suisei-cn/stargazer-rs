@@ -28,6 +28,9 @@ mod handler;
 mod killer;
 mod watchdog;
 
+#[cfg(test)]
+mod tests;
+
 #[pin_project(project = ServerHandlerProj)]
 pub enum ServerHandler {
     NoHTTP(#[pin] ArbiterHandler),
