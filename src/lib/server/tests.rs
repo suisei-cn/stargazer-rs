@@ -82,13 +82,13 @@ mod killer {
             let addr = KillerActor::from_registry();
             addr.do_send(Kill::new(true));
         });
-        sys.run();
+        sys.run(); // join system
 
         System::new().block_on(async {
             // Here we spawned a future and use recv instead of blocking_recv
             // because we don't want the test stuck forever if it's failed.
             let fut = timeout(Duration::from_millis(150), rx.recv());
-            assert!(dbg!(fut.await).is_err(), "system is not killed");
+            assert!(fut.await.is_err(), "system is not killed");
         });
     }
 }
@@ -118,5 +118,16 @@ mod watchdog {
             let fut = timeout(Duration::from_millis(100), rx.recv());
             assert!(fut.await.is_ok(), "watchdog failed to send die signal");
         });
+    }
+
+    #[actix::test]
+    #[should_panic]
+    async fn must_not_create_multiple_watchdog() {
+        for _ in 0..3 {
+            let (tx, rx) = unbounded_channel();
+            // leak rx so that the channel won't be closed causing unexpected panics
+            Box::leak(Box::new(rx));
+            WatchdogActor::start(tx);
+        }
     }
 }

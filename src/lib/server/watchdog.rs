@@ -14,7 +14,10 @@ impl WatchdogActor {
     pub fn start(tx: UnboundedSender<()>) {
         let act = Self(tx);
         let addr = act.start();
-        LOCAL_WATCHDOG.with(|f| *f.borrow_mut() = Some(addr));
+        LOCAL_WATCHDOG.with(|f| {
+            assert!(f.borrow().is_none(), "cannot run two watchdog on the same arbiter");
+            *f.borrow_mut() = Some(addr)
+        });
     }
 }
 
