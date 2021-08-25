@@ -20,5 +20,6 @@ pub mod context;
 mod error;
 mod event_source;
 mod model;
+pub mod request;
 mod server;
 pub mod worker;
