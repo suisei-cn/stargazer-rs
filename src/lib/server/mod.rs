@@ -21,7 +21,6 @@ pub use killer::KillerActor;
 use killer::RegisterHttpServer;
 
 use crate::context::{ArbiterContext, InstanceContext};
-use crate::error::Result;
 use crate::server::watchdog::WatchdogActor;
 
 mod handler;
@@ -78,10 +77,10 @@ where
 {
     /// Create a new server instance.
     ///
-    /// F: instance_id -> (ArbiterContext, HttpServices)
+    /// F: `instance_id` -> (`ArbiterContext`, `HttpServices`)
     pub fn new(factory: F) -> Self {
         let ctx = InstanceContext::new();
-        Server {
+        Self {
             factory,
             workers: num_cpus::get(),
             instance_ctx: Arc::new(RwLock::new(ctx)),
@@ -102,7 +101,15 @@ where
     F: Fn(Uuid) -> (ArbiterContext, SF) + Send + Sync + Clone + 'static,
     SF: 'static + FnOnce(&mut ServiceConfig),
 {
-    pub fn run(self, mode: ServerMode) -> Result<ServerHandler> {
+    /// Start the server.
+    ///
+    /// This function will return a [`ServerHandler`](ServerHandler).
+    /// You may want to `await` it to block on the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns `std::io::Error` if error occur when binding the port.
+    pub fn run(self, mode: ServerMode) -> std::io::Result<ServerHandler> {
         let instance_id = self.instance_ctx.read().id();
         let instance_ctx = self.instance_ctx;
         let factory = self.factory;
@@ -122,7 +129,7 @@ where
                     });
                 };
                 for _ in 0..self.workers {
-                    (arb_factory.clone())()
+                    (arb_factory.clone())();
                 }
 
                 KillerActor::from_registry();
@@ -142,8 +149,7 @@ where
                         .configure(http_services)
                 })
                 .workers(self.workers)
-                .bind(port)
-                .unwrap()
+                .bind(port)?
                 .run();
 
                 KillerActor::from_registry().do_send(RegisterHttpServer::new(srv.clone()));

@@ -10,7 +10,7 @@ use crate::error::{Error, Result};
 use crate::utils::TypeEq;
 use crate::worker::messages::GetId;
 
-pub trait MessageTarget: Copy {
+pub trait MessageTarget: Copy + Send {
     type Actor: Actor;
     type Addr: TypeEq<Other = Addr<Self::Actor>>;
 }
@@ -23,10 +23,10 @@ pub struct ArbiterContext {
 }
 
 impl ArbiterContext {
-    pub fn instance_id(&self) -> Uuid {
+    pub const fn instance_id(&self) -> Uuid {
         self.instance_id
     }
-    pub fn arbiter_id(&self) -> Uuid {
+    pub const fn arbiter_id(&self) -> Uuid {
         self.arbiter_id
     }
 }
@@ -45,6 +45,16 @@ impl ArbiterContext {
         self
     }
 
+    /// Send a message to a registered actor.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `MessageTarget` invariant doesn't hold (The address and actor type doesn't match).
+    /// This should never happen due to the `TypeEq` bound.
+    ///
+    /// # Errors
+    ///
+    /// Raise an [`Error::Context`](Error::Context) when there's no such actor in the context.
     pub async fn send<Target, Act, AddrT, MsgT, Output>(
         &self,
         _target: Target,
@@ -64,7 +74,7 @@ impl ArbiterContext {
             .ok_or(Error::Context)?
             .downcast_ref()
             .unwrap();
-        Ok(addr.send(msg).await.unwrap())
+        Ok(addr.send(msg).await.unwrap()) // TODO better error handling
     }
 }
 
@@ -87,13 +97,23 @@ impl InstanceContext {
     pub fn new() -> Self {
         Default::default()
     }
-    pub fn id(&self) -> Uuid {
+    pub const fn id(&self) -> Uuid {
         self.instance_id
     }
     pub fn register(&mut self, ctx: ArbiterContext) {
         self.arbiters.push(ctx);
     }
 
+    /// Send a message to a registered actor.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `MessageTarget` invariant doesn't hold (The address and actor type doesn't match).
+    /// This should never happen due to the `TypeEq` bound.
+    ///
+    /// # Errors
+    ///
+    /// Raise an [`Error::Context`](Error::Context) when there's no such actor in the context.
     pub async fn send<Target, Act, AddrT, MsgT, Output>(
         &self,
         target: Target,
@@ -102,8 +122,7 @@ impl InstanceContext {
     where
         Target: MessageTarget<Actor = Act, Addr = AddrT>,
         Act: Actor + Handler<MsgT> + Handler<GetId>,
-        Act::Context: ToEnvelope<Act, MsgT>,
-        Act::Context: ToEnvelope<Act, GetId>,
+        Act::Context: ToEnvelope<Act, MsgT> + ToEnvelope<Act, GetId>,
         MsgT: Message<Result = Output> + Clone + Send + 'static,
         AddrT: 'static,
         Output: Send,
@@ -123,8 +142,7 @@ impl InstanceContext {
         .into_iter()
         .map(|(id, output)| match (id, output) {
             (Ok(id), Ok(output)) => Ok((id, output)),
-            (Err(e), _) => Err(e),
-            (_, Err(e)) => Err(e),
+            (Err(e), _) | (_, Err(e)) => Err(e),
         })
         .collect()
     }

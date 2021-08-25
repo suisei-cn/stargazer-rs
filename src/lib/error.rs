@@ -6,16 +6,10 @@ use thiserror::Error;
 pub enum Error {
     #[error("json: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("config: {0}")]
-    Config(#[from] ConfigError),
+    #[error("io: {0}")]
+    Io(#[from] std::io::Error),
     #[error("context: no such worker in context")]
     Context,
-}
-
-impl From<config::ConfigError> for Error {
-    fn from(e: config::ConfigError) -> Self {
-        Self::Config(e.into())
-    }
 }
 
 #[derive(Debug, Error)]

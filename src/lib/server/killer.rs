@@ -6,8 +6,8 @@ use actix_web::dev::Server as ActixServer;
 pub struct RegisterHttpServer(ActixServer);
 
 impl RegisterHttpServer {
-    pub fn new(srv: ActixServer) -> Self {
-        RegisterHttpServer(srv)
+    pub const fn new(srv: ActixServer) -> Self {
+        Self(srv)
     }
 }
 
@@ -18,8 +18,8 @@ pub struct Kill {
 }
 
 impl Kill {
-    pub fn new(graceful: bool) -> Self {
-        Kill { graceful }
+    pub const fn new(graceful: bool) -> Self {
+        Self { graceful }
     }
 }
 
@@ -32,7 +32,7 @@ impl KillerActor {
     }
 
     pub fn kill(graceful: bool) {
-        KillerActor::from_registry().do_send(Kill::new(graceful))
+        Self::from_registry().do_send(Kill::new(graceful));
     }
 }
 
@@ -58,7 +58,7 @@ impl Handler<Kill> for KillerActor {
 
     fn handle(&mut self, msg: Kill, _ctx: &mut Self::Context) -> Self::Result {
         if let Some(http_server) = &self.0 {
-            http_server.stop(msg.graceful); // deliberately not awaited
+            drop(http_server.stop(msg.graceful)); // deliberately not awaited
         } else {
             System::current().stop();
         }

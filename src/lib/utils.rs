@@ -3,7 +3,7 @@ pub trait TypeEq {
 }
 
 impl<T> TypeEq for T {
-    type Other = T;
+    type Other = Self;
 }
 
 #[macro_export]

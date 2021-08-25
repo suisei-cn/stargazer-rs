@@ -1,13 +1,13 @@
 use std::net::IpAddr;
 use std::path::Path;
-use std::result::Result as StdResult;
 
 use config::Source;
 use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::error::{ConfigError, Result};
+use crate::error::ConfigError;
 
+/// Contains all configuration to run the application.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct Config {
     #[serde(rename = "HTTP")]
@@ -15,22 +15,39 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(config: Option<&Path>) -> Result<Config> {
+    /// Construct a new [`Config`](Config).
+    ///
+    /// `/etc/stargazer/config.toml`, `~/.config/stargazer/config.toml` and `./config.toml` will be merged in order if exists.
+    /// If a path is specified, the files described earlier will be ignored.
+    ///
+    /// `toml` and `json` are both supported.
+    ///
+    /// Environmental values started with `stargazer_` may override parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConfigError`](ConfigError) if there's no config source available or there's any parsing error.
+    #[allow(clippy::missing_panics_doc)]
+    pub fn new(config: Option<&Path>) -> Result<Self, ConfigError> {
         let config = if let Some(config) = config {
             config::Config::new().with_merged(config::File::from(config).required(false))?
         } else {
             config::Config::new()
-                .with_merged(config::File::with_name("/etc/config").required(false))?
+                .with_merged(config::File::with_name("/etc/stargazer/config").required(false))?
                 .with_merged(
-                    config::File::from(dirs::config_dir().unwrap_or_default().join("config"))
-                        .required(false),
+                    config::File::from(
+                        dirs::config_dir()
+                            .unwrap_or_default()
+                            .join("stargazer/config"),
+                    )
+                    .required(false),
                 )?
                 .with_merged(config::File::with_name("config").required(false))?
         }
         .with_merged(config::Environment::with_prefix("stargazer"))?;
 
         if config.collect().unwrap().is_empty() {
-            return Err(ConfigError::Missing.into());
+            return Err(ConfigError::Missing);
         }
 
         Ok(config.try_into()?)
@@ -48,7 +65,7 @@ pub enum HTTP {
 }
 
 impl Serialize for HTTP {
-    fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -82,7 +99,7 @@ impl Serialize for HTTP {
 }
 
 impl<'de> Deserialize<'de> for HTTP {
-    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {

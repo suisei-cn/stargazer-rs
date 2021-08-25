@@ -1,10 +1,10 @@
-use std::cell::RefCell;
+use std::cell::Cell;
 
 use actix::{Actor, Addr, Context};
 use tokio::sync::mpsc::UnboundedSender;
 
 thread_local! {
-    static LOCAL_WATCHDOG: RefCell<Option<Addr<WatchdogActor>>> = RefCell::new(None);
+    static LOCAL_WATCHDOG: Cell<Option<Addr<WatchdogActor>>> = Cell::new(None);
 }
 
 #[derive(Debug)]
@@ -16,10 +16,9 @@ impl WatchdogActor {
         let addr = act.start();
         LOCAL_WATCHDOG.with(|f| {
             assert!(
-                f.borrow().is_none(),
+                f.replace(Some(addr)).is_none(),
                 "cannot run two watchdogs on the same arbiter"
             );
-            *f.borrow_mut() = Some(addr)
         });
     }
 }
