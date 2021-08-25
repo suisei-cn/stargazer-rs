@@ -1,5 +1,5 @@
 use actix::Message;
-use serde::{Deserialize, Serialize};
+use serde::{Serialize, Deserialize};
 use serde_json::to_string;
 
 use crate::error::Result;

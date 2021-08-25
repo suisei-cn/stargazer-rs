@@ -90,9 +90,7 @@ mod killer {
             // because we don't want the test stuck forever if it's failed.
             let fut = timeout(Duration::from_millis(150), rx.recv());
             assert!(fut.await.is_err(), "system is not killed");
-            System::current().stop();
         });
-        sys.run();
     }
 }
 
@@ -121,13 +119,9 @@ mod watchdog {
 
             let sys = System::new();
             sys.block_on(async {
-                // Here we spawned a future and use recv instead of blocking_recv
-                // because we don't want the test stuck forever if it's failed.
                 let fut = timeout(Duration::from_millis(100), rx.recv());
                 assert!(fut.await.is_ok(), "watchdog failed to send die signal");
-                System::current().stop();
             });
-            sys.run();
         })
         .join()
         .unwrap();
@@ -147,7 +141,6 @@ mod watchdog {
                 }
                 System::current().stop()
             });
-            sys.run()
         })
         .join()
         {
