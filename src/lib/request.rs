@@ -5,8 +5,9 @@ use std::task::{Context, Poll};
 use actix::dev::{Request, ToEnvelope};
 use actix::MailboxError;
 use actix::{Actor, Addr, Handler, Message};
+use futures::ready;
+use pin_project::pin_project;
 
-// TODO make it a monoid `[(addr, msg)] | [Req] | TT`
 #[must_use = "You have to await on request, call `blocking()` or `immediately()`, otherwise the message wont be delivered"]
 pub enum MsgRequest<'a, A, M>
 where
@@ -16,8 +17,8 @@ where
     M::Result: Send,
 {
     Initial { target: &'a Addr<A>, msg: Option<M> },
-    Pending(Request<A, M>),
-    Fused,
+    Pending(#[pin] Request<A, M>),
+    Gone,
 }
 
 impl<'a, A, M> MsgRequest<'a, A, M>
@@ -77,32 +78,21 @@ where
 {
     type Output = Result<O, MailboxError>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut rtn = Poll::Pending;
-        unsafe {
-            self.map_unchecked_mut(|this| {
-                match this {
-                    MsgRequest::Initial { target, msg } => {
-                        // SAFETY
-                        // `msg` is Unpin.
-                        *this = Self::Pending(target.send(msg.take().unwrap()));
-                        cx.waker().wake_by_ref(); // can be immediately polled to receive result
-                    }
-                    MsgRequest::Pending(req) => {
-                        // SAFETY
-                        // `req` is immediately pinned again.
-                        let req = Pin::new_unchecked(req);
-                        if let Poll::Ready(r) = req.poll(cx) {
-                            *this = Self::Fused; // fuse this message request
-                            rtn = Poll::Ready(r); // result is ready
-                        };
-                    }
-                    MsgRequest::Fused => panic!("request fused and can't be polled again"),
-                };
-                this
-            });
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.as_mut().project() {
+            MsgRequestProj::Initial { target, msg } => {
+                let fut = target.send(msg.take().unwrap());
+                self.set(Self::Pending(fut));
+                cx.waker().wake_by_ref(); // can be polled immediately to receive result
+                Poll::Pending
+            }
+            MsgRequestProj::Pending(req) => {
+                let r = ready!(req.poll(cx));
+                self.set(Self::Gone); // seal this message request
+                Poll::Ready(r)
+            }
+            MsgRequestProj::Gone => panic!("request done and can't be polled again"),
         }
-        rtn
     }
 }
 
