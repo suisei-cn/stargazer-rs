@@ -1,14 +1,140 @@
 use std::future::Future;
+use std::mem;
+use std::ops::Add;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use actix::dev::{Request, ToEnvelope};
 use actix::MailboxError;
 use actix::{Actor, Addr, Handler, Message};
+use futures::future::JoinAll;
 use futures::ready;
 use pin_project::pin_project;
 
+#[must_use = "You have to await on requests, call `blocking()` or `immediately()`, otherwise the message wont be delivered"]
+#[pin_project(project = MsgRequestsProj)]
+pub enum MsgRequests<'a, A, M>
+where
+    A: Actor + Handler<M>,
+    A::Context: ToEnvelope<A, M>,
+    M: Message + Send + Unpin + 'static,
+    M::Result: Send,
+{
+    Init(Vec<MsgRequest<'a, A, M>>),
+    Fut(#[pin] JoinAll<MsgRequest<'a, A, M>>),
+    Gone,
+}
+
+impl<'a, A, M> MsgRequests<'a, A, M>
+where
+    A: Actor + Handler<M>,
+    A::Context: ToEnvelope<A, M>,
+    M: Message + Send + Unpin + 'static,
+    M::Result: Send,
+{
+    pub fn new(req: impl IntoIterator<Item = MsgRequest<'a, A, M>>) -> Self {
+        Self::Init(req.into_iter().collect())
+    }
+}
+
+impl<'a, A, M> Add for MsgRequests<'a, A, M>
+where
+    A: Actor + Handler<M>,
+    A::Context: ToEnvelope<A, M>,
+    M: Message + Send + Unpin + 'static,
+    M::Result: Send,
+{
+    type Output = MsgRequests<'a, A, M>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        if let (Self::Init(mut this), Self::Init(rhs)) = (self, rhs) {
+            this.extend(rhs);
+            Self::Init(this)
+        } else {
+            panic!("one of the `MsgRequests` was polled");
+        }
+    }
+}
+
+impl<'a, A, M> Add<MsgRequest<'a, A, M>> for MsgRequests<'a, A, M>
+where
+    A: Actor + Handler<M>,
+    A::Context: ToEnvelope<A, M>,
+    M: Message + Send + Unpin + 'static,
+    M::Result: Send,
+{
+    type Output = MsgRequests<'a, A, M>;
+
+    fn add(self, rhs: MsgRequest<'a, A, M>) -> Self::Output {
+        if let Self::Init(mut this) = self {
+            this.push(rhs);
+            Self::Init(this)
+        } else {
+            panic!("this `MsgRequest` was polled");
+        }
+    }
+}
+
+impl<'a, A, M, O> MsgRequests<'a, A, M>
+where
+    A: Actor + Handler<M>,
+    A::Context: ToEnvelope<A, M>,
+    M: Message<Result = O> + Send + Unpin + 'static,
+    O: Send,
+{
+    /// Sends messages unconditionally, bypassing mailbox limit and ignore its response.
+    pub fn immediately(self) {
+        if let Self::Init(l) = self {
+            l.into_iter().for_each(MsgRequest::immediately);
+        }
+    }
+
+    /// Sends messages with blocking.
+    ///
+    /// # Panics
+    /// Panics when called in an `actix-rt`(`tokio`) context, or any `MsgRequest` has already been polled halfway.
+    #[allow(clippy::missing_errors_doc)]
+    pub fn blocking(self) -> Vec<Result<O, MailboxError>> {
+        if matches!(self, Self::Init(_)) {
+            actix_rt::Runtime::new()
+                .expect("unable to create runtime")
+                .block_on(self)
+        } else {
+            panic!("already been polled halfway")
+        }
+    }
+}
+
+impl<'a, A, M, O> Future for MsgRequests<'a, A, M>
+where
+    A: Actor + Handler<M>,
+    A::Context: ToEnvelope<A, M>,
+    M: Message<Result = O> + Send + Unpin,
+    O: Send,
+{
+    type Output = Vec<Result<O, MailboxError>>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.as_mut().project() {
+            MsgRequestsProj::Init(reqs) => {
+                let reqs = mem::take(reqs);
+                let futs = futures::future::join_all(reqs);
+                self.set(Self::Fut(futs));
+                cx.waker().wake_by_ref(); // can be polled immediately to receive result
+                Poll::Pending
+            }
+            MsgRequestsProj::Fut(fut) => {
+                let res = ready!(fut.poll(cx));
+                self.set(Self::Gone); // seal this MsgRequests
+                Poll::Ready(res)
+            }
+            MsgRequestsProj::Gone => panic!("requests done and can't be polled again"),
+        }
+    }
+}
+
 #[must_use = "You have to await on request, call `blocking()` or `immediately()`, otherwise the message wont be delivered"]
+#[pin_project(project = MsgRequestProj)]
 pub enum MsgRequest<'a, A, M>
 where
     A: Actor + Handler<M>,
@@ -103,7 +229,7 @@ mod tests {
 
     use actix::{Actor, Context, Handler, Message, System};
 
-    use super::MsgRequest;
+    use super::{MsgRequest, MsgRequests};
 
     #[derive(Debug, Message)]
     #[rtype("usize")]
@@ -173,6 +299,81 @@ mod tests {
         let addr = rx.recv().unwrap();
         let req = MsgRequest::new(&addr, Ping(42, true));
         assert_eq!(req.blocking().unwrap(), 42, "response incorrect");
+
+        sys_thread.join().unwrap(); // sys thread should join and mustn't panic
+    }
+
+    #[actix::test]
+    async fn must_reqs_do() {
+        let addr1 = Echo::default().start();
+        let addr2 = Echo::default().start();
+        let addr3 = Echo::default().start();
+        let reqs = MsgRequests::new([
+            MsgRequest::new(&addr1, Ping(41, false)),
+            MsgRequest::new(&addr2, Ping(42, false)),
+            MsgRequest::new(&addr3, Ping(43, false)),
+        ]);
+        reqs.immediately();
+        tokio::task::yield_now().await;
+        assert_eq!(
+            addr1.send(Query).await.unwrap(),
+            41,
+            "message not delivered"
+        );
+        assert_eq!(
+            addr2.send(Query).await.unwrap(),
+            42,
+            "message not delivered"
+        );
+        assert_eq!(
+            addr3.send(Query).await.unwrap(),
+            43,
+            "message not delivered"
+        );
+    }
+
+    #[actix::test]
+    async fn must_reqs_await() {
+        let addr = Echo::default().start();
+        let reqs = MsgRequests::new([
+            MsgRequest::new(&addr, Ping(41, false)),
+            MsgRequest::new(&addr, Ping(42, false)),
+            MsgRequest::new(&addr, Ping(43, false)),
+        ]);
+        assert_eq!(
+            reqs.await
+                .into_iter()
+                .map(Result::unwrap)
+                .collect::<Vec<_>>(),
+            vec![41, 42, 43],
+            "response incorrect"
+        );
+    }
+
+    #[test]
+    fn must_reqs_blocking() {
+        let (tx, rx) = channel();
+
+        // spawn in a new thread to avoid blocking main thread
+        let sys_thread = thread::spawn(move || {
+            let sys = System::new();
+            sys.block_on(async {
+                let addr = Echo::default().start();
+                tx.send(addr).unwrap();
+            });
+            sys.run(); // join system
+        });
+
+        let addr = rx.recv().unwrap();
+        let reqs = MsgRequests::new([MsgRequest::new(&addr, Ping(42, true))]);
+        assert_eq!(
+            reqs.blocking()
+                .into_iter()
+                .map(Result::unwrap)
+                .collect::<Vec<_>>(),
+            vec![42],
+            "response incorrect"
+        );
 
         sys_thread.join().unwrap(); // sys thread should join and mustn't panic
     }
