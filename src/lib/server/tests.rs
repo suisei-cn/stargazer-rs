@@ -65,24 +65,26 @@ mod killer {
 
     #[test]
     fn must_kill_system() {
-        let sys = System::new();
         let (tx, mut rx) = unbounded_channel();
 
-        sys.block_on(async {
-            // clone the channel so that it won't be closed
-            let tx = tx.clone();
+        {
+            let sys = System::new();
+            sys.block_on(async {
+                // clone the channel so that it won't be closed
+                let tx = tx.clone();
 
-            actix::spawn(async move {
-                sleep(Duration::from_millis(100)).await;
-                // Killer failed to reap this system, notify main thread
-                tx.send(());
-                System::current().stop(); // cleanup
+                actix::spawn(async move {
+                    sleep(Duration::from_millis(100)).await;
+                    // Killer failed to reap this system, notify main thread
+                    tx.send(());
+                    System::current().stop(); // cleanup
+                });
+
+                let addr = KillerActor::from_registry();
+                addr.do_send(Kill::new(true));
             });
-
-            let addr = KillerActor::from_registry();
-            addr.do_send(Kill::new(true));
-        });
-        sys.run(); // join system
+            sys.run(); // join system
+        }
 
         let sys = System::new();
         sys.block_on(async {
@@ -109,13 +111,15 @@ mod watchdog {
     fn must_send_when_stopped() {
         // spawn a new thread to avoid polluting thread local storage
         thread::spawn(|| {
-            let sys = System::new();
             let (tx, mut rx) = unbounded_channel();
-            sys.block_on(async {
-                WatchdogActor::start(tx.clone()); // start watchdog
-                System::current().stop(); // trigger watchdog
-            });
-            sys.run(); // join system
+            {
+                let sys = System::new();
+                sys.block_on(async {
+                    WatchdogActor::start(tx.clone()); // start watchdog
+                    System::current().stop(); // trigger watchdog
+                });
+                sys.run(); // join system
+            }
 
             let sys = System::new();
             sys.block_on(async {
