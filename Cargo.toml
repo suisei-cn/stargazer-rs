@@ -24,6 +24,7 @@ clap = "3.0.0-beta.4"
 config = { version = "0.11", features = ["toml", "json"], default-features = true }
 dirs = "3.0"
 futures = "0.3"
+itertools = "0.10"
 log = "0.4"
 num_cpus = "1.13"
 parking_lot = "0.11"

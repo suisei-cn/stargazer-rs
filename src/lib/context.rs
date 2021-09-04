@@ -3,12 +3,16 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use actix::dev::ToEnvelope;
-use actix::{Actor, Addr, Handler, Message};
+use actix::{Actor, Addr, Handler, MailboxError, Message};
+use itertools::Itertools;
 use uuid::Uuid;
 
 use crate::error::{Error, Result};
+use crate::request::{MsgRequest, MsgRequestTuple, MsgRequestVec, RequestTrait};
 use crate::utils::TypeEq;
 use crate::worker::messages::GetId;
+
+type StdResult<T, E> = std::result::Result<T, E>;
 
 pub trait MessageTarget: Copy + Send {
     type Actor: Actor;
@@ -55,18 +59,18 @@ impl ArbiterContext {
     /// # Errors
     ///
     /// Raise an [`Error::Context`](Error::Context) when there's no such actor in the context.
-    pub async fn send<Target, Act, AddrT, MsgT, Output>(
+    pub fn send<Target, Act, AddrT, MsgT>(
         &self,
         _target: Target,
         msg: MsgT,
-    ) -> Result<Output>
+    ) -> Result<MsgRequest<'_, Act, MsgT>>
     where
         Target: MessageTarget<Actor = Act, Addr = AddrT>,
         Act: Actor + Handler<MsgT>,
         Act::Context: ToEnvelope<Act, MsgT>,
-        MsgT: Message<Result = Output> + Send + 'static,
+        MsgT: Message + Send + 'static,
+        MsgT::Result: Send,
         AddrT: 'static,
-        Output: Send,
     {
         let addr: &Addr<Act> = self
             .addrs
@@ -74,7 +78,7 @@ impl ArbiterContext {
             .ok_or(Error::Context)?
             .downcast_ref()
             .unwrap();
-        Ok(addr.send(msg).await.unwrap()) // TODO better error handling
+        Ok(MsgRequest::new(addr, msg))
     }
 }
 
@@ -114,36 +118,38 @@ impl InstanceContext {
     /// # Errors
     ///
     /// Raise an [`Error::Context`](Error::Context) when there's no such actor in the context.
-    pub async fn send<Target, Act, AddrT, MsgT, Output>(
-        &self,
+    pub fn send<'a, Target, Act, AddrT, MsgT, Output, R>(
+        &'a self,
         target: Target,
-        msg: MsgT,
-    ) -> Result<Vec<(Uuid, Output)>>
+        msg: &MsgT,
+    ) -> Result<impl RequestTrait + 'a>
     where
         Target: MessageTarget<Actor = Act, Addr = AddrT>,
         Act: Actor + Handler<MsgT> + Handler<GetId>,
         Act::Context: ToEnvelope<Act, MsgT> + ToEnvelope<Act, GetId>,
-        MsgT: Message<Result = Output> + Clone + Send + 'static,
+        MsgT: Message<Result = Output> + Clone + Send + Unpin + 'static,
         AddrT: 'static,
-        Output: Send,
+        Output: Send + 'a,
     {
-        futures::future::join_all(
-            self.arbiters
-                .iter()
-                .map(|arbiter| (arbiter, msg.clone()))
-                .map(|(arbiter, msg)| async move {
-                    (
-                        arbiter.send(target, GetId).await,
-                        arbiter.send(target, msg).await,
-                    )
-                }),
+        // MsgRequestVec::new(
+        let ids: Vec<_> = self
+            .arbiters
+            .iter()
+            .map(|arbiter| arbiter.send(target, GetId))
+            .try_collect()?;
+        let resps: Vec<_> = self
+            .arbiters
+            .iter()
+            .map(|arbiter| arbiter.send(target, msg.clone()))
+            .try_collect()?;
+        Ok(
+            MsgRequestTuple::new(MsgRequestVec::new(ids), MsgRequestVec::new(resps)).map(
+                |(ids, resps)| -> StdResult<_, MailboxError> {
+                    let ids: Vec<_> = ids.into_iter().try_collect()?;
+                    let resps: Vec<_> = resps.into_iter().try_collect()?;
+                    Ok(ids.into_iter().zip(resps).collect_vec())
+                },
+            ),
         )
-        .await
-        .into_iter()
-        .map(|(id, output)| match (id, output) {
-            (Ok(id), Ok(output)) => Ok((id, output)),
-            (Err(e), _) | (_, Err(e)) => Err(e),
-        })
-        .collect()
     }
 }

@@ -88,10 +88,10 @@ where
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.as_mut().project() {
             MsgRequestMapProj::Init(req, f) => {
-                let res = ready!(req.poll(cx));
+                let ready = ready!(req.poll(cx));
                 let f = f.take().unwrap();
                 self.set(Self::Gone); // seal this MsgRequestTuple
-                Poll::Ready(f(res))
+                Poll::Ready(f(ready))
             }
             MsgRequestMapProj::Gone => panic!("requests done and can't be polled again"),
         }
@@ -169,7 +169,7 @@ impl<R: Future> MsgRequestVec<R> {
 }
 
 impl<R: Future> Add for MsgRequestVec<R> {
-    type Output = MsgRequestVec<R>;
+    type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
         if let (Self::Init(mut this), Self::Init(rhs)) = (self, rhs) {
@@ -182,7 +182,7 @@ impl<R: Future> Add for MsgRequestVec<R> {
 }
 
 impl<R: Future> Add<R> for MsgRequestVec<R> {
-    type Output = MsgRequestVec<R>;
+    type Output = Self;
 
     fn add(self, rhs: R) -> Self::Output {
         if let Self::Init(mut this) = self {

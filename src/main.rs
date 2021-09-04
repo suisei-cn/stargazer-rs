@@ -63,7 +63,7 @@ impl_stop_on_panic!(PanicActor);
 
 #[actix_web::get("/panic")]
 async fn panic_serv(ctx: actix_web::web::Data<ArbiterContext>) -> impl Responder {
-    ctx.send(PanicTarget, PanicSignal).await;
+    ctx.send(PanicTarget, PanicSignal).unwrap().await;
     "ok"
 }
 
