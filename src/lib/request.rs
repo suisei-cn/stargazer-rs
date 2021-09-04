@@ -505,7 +505,7 @@ mod tests {
             MsgRequest::new(&addr, Ping(42, false)),
         );
         let res = reqs.await;
-        assert_eq!(reqs.0.unwrap(), 41, "response incorrect");
-        assert_eq!(reqs.1.unwrap(), 41, "response incorrect");
+        assert_eq!(res.0.unwrap(), 41, "response incorrect");
+        assert_eq!(res.1.unwrap(), 42, "response incorrect");
     }
 }
