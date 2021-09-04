@@ -11,16 +11,16 @@ use futures::future::{Join, JoinAll};
 use futures::ready;
 use pin_project::pin_project;
 
-pub trait RequestTrait: Future {
+pub trait RequestTrait<'a>: RequestTraitBoxExt {
     /// Sends messages unconditionally, bypassing mailbox limit and ignore its response.
     fn immediately(self);
     /// Sends messages with blocking.
     ///
     /// # Panics
     /// Panics when called in an `actix-rt`(`tokio`) context, or any `MsgRequest` has already been polled halfway.
-    fn blocking(self) -> <Self as Future>::Output;
+    fn blocking(self) -> Self::Output;
 
-    fn join<R: RequestTrait + Sized>(self, other: R) -> MsgRequestTuple<Self, R>
+    fn join<R: RequestTrait<'a> + Sized>(self, other: R) -> MsgRequestTuple<Self, R>
     where
         Self: Sized,
     {
@@ -32,6 +32,42 @@ pub trait RequestTrait: Future {
         Self: Sized,
     {
         MsgRequestMap::new(self, f)
+    }
+
+    fn into_pinned_box(self) -> Pin<Box<dyn RequestTrait<'a, Output = Self::Output> + 'a>>
+    where
+        Self: 'a + Sized,
+    {
+        Box::pin(self)
+    }
+}
+
+pub trait RequestTraitBoxExt: Future {
+    fn pinned_immediately(self: Pin<Box<Self>>);
+    fn pinned_blocking(self: Pin<Box<Self>>) -> Self::Output;
+}
+
+impl<'a, T: RequestTrait<'a>> RequestTraitBoxExt for T {
+    // SAFETY
+    // If `self` is in any of the Unpin state, it will immediately panic
+    fn pinned_immediately(self: Pin<Box<Self>>) {
+        unsafe { Pin::into_inner_unchecked(self).immediately(); }
+    }
+
+    // SAFETY
+    // If `self` is in any of the Unpin state, it will immediately panic
+    fn pinned_blocking(self: Pin<Box<Self>>) -> Self::Output {
+        unsafe { Pin::into_inner_unchecked(self).blocking() }
+    }
+}
+
+impl<'a, O> RequestTrait<'a> for Pin<Box<dyn RequestTrait<'a, Output = O> + 'a>> {
+    fn immediately(self) {
+        self.pinned_immediately();
+    }
+
+    fn blocking(self) -> Self::Output {
+        self.pinned_blocking()
     }
 }
 
@@ -56,14 +92,16 @@ where
     }
 }
 
-impl<R, O, F> RequestTrait for MsgRequestMap<R, O, F>
+impl<'a, R, O, F> RequestTrait<'_> for MsgRequestMap<R, O, F>
 where
-    R: RequestTrait,
+    R: RequestTrait<'a>,
     F: FnOnce(R::Output) -> O,
 {
     fn immediately(self) {
         if let Self::Init(r, _) = self {
             r.immediately();
+        } else {
+            panic!("already been polled halfway");
         }
     }
 
@@ -112,11 +150,13 @@ impl<R1: Future, R2: Future> MsgRequestTuple<R1, R2> {
     }
 }
 
-impl<R1: RequestTrait, R2: RequestTrait> RequestTrait for MsgRequestTuple<R1, R2> {
+impl<'a, R1: RequestTrait<'a>, R2: RequestTrait<'a>> RequestTrait<'_> for MsgRequestTuple<R1, R2> {
     fn immediately(self) {
         if let Self::Init(r1, r2) = self {
             r1.unwrap().immediately();
             r2.unwrap().immediately();
+        } else {
+            panic!("already been polled halfway");
         }
     }
 
@@ -131,7 +171,7 @@ impl<R1: RequestTrait, R2: RequestTrait> RequestTrait for MsgRequestTuple<R1, R2
     }
 }
 
-impl<R1: RequestTrait, R2: RequestTrait> Future for MsgRequestTuple<R1, R2> {
+impl<'a, R1: RequestTrait<'a>, R2: RequestTrait<'a>> Future for MsgRequestTuple<R1, R2> {
     type Output = (R1::Output, R2::Output);
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -194,10 +234,12 @@ impl<R: Future> Add<R> for MsgRequestVec<R> {
     }
 }
 
-impl<R: RequestTrait> RequestTrait for MsgRequestVec<R> {
+impl<'a, R: RequestTrait<'a>> RequestTrait<'a> for MsgRequestVec<R> {
     fn immediately(self) {
         if let Self::Init(l) = self {
             l.into_iter().for_each(RequestTrait::immediately);
+        } else {
+            panic!("already been polled halfway");
         }
     }
 
@@ -213,7 +255,7 @@ impl<R: RequestTrait> RequestTrait for MsgRequestVec<R> {
     }
 }
 
-impl<R: RequestTrait> Future for MsgRequestVec<R> {
+impl<'a, R: RequestTrait<'a>> Future for MsgRequestVec<R> {
     type Output = Vec<R::Output>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -264,7 +306,7 @@ where
     }
 }
 
-impl<'a, A, M, O> RequestTrait for MsgRequest<'a, A, M>
+impl<'a, A, M, O> RequestTrait<'_> for MsgRequest<'a, A, M>
 where
     A: Actor + Handler<M>,
     A::Context: ToEnvelope<A, M>,
@@ -275,6 +317,8 @@ where
         // If it's been polled or ready, don't do anything.
         if let Self::Initial { target, msg } = self {
             target.do_send(msg.unwrap());
+        } else {
+            panic!("already been polled halfway");
         }
     }
 
@@ -507,5 +551,42 @@ mod tests {
         let res = reqs.await;
         assert_eq!(res.0.unwrap(), 41, "response incorrect");
         assert_eq!(res.1.unwrap(), 42, "response incorrect");
+    }
+
+    #[actix::test]
+    async fn must_req_dyn_do() {
+        let addr = Echo::default().start();
+        let req = MsgRequest::new(&addr, Ping(42, false)).into_pinned_box();
+        req.immediately();
+        tokio::task::yield_now().await;
+        assert_eq!(addr.send(Query).await.unwrap(), 42, "message not delivered");
+    }
+
+    #[actix::test]
+    async fn must_req_dyn_await() {
+        let addr = Echo::default().start();
+        let req = MsgRequest::new(&addr, Ping(42, false)).into_pinned_box();
+        assert_eq!(req.await.unwrap(), 42, "response incorrect");
+    }
+
+    #[test]
+    fn must_req_dyn_blocking() {
+        let (tx, rx) = channel();
+
+        // spawn in a new thread to avoid blocking main thread
+        let sys_thread = thread::spawn(move || {
+            let sys = System::new();
+            sys.block_on(async {
+                let addr = Echo::default().start();
+                tx.send(addr).unwrap();
+            });
+            sys.run(); // join system
+        });
+
+        let addr = rx.recv().unwrap();
+        let req = MsgRequest::new(&addr, Ping(42, true)).into_pinned_box();
+        assert_eq!(req.blocking().unwrap(), 42, "response incorrect");
+
+        sys_thread.join().unwrap(); // sys thread should join and mustn't panic
     }
 }
