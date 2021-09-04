@@ -11,6 +11,36 @@ use futures::future::JoinAll;
 use futures::ready;
 use pin_project::pin_project;
 
+trait RequestTrait: Future {
+    /// Sends messages unconditionally, bypassing mailbox limit and ignore its response.
+    fn immediately(self);
+    /// Sends messages with blocking.
+    ///
+    /// # Panics
+    /// Panics when called in an `actix-rt`(`tokio`) context, or any `MsgRequest` has already been polled halfway.
+    fn blocking(self) -> <Self as Future>::Output;
+}
+
+trait BoxedRequestTrait: Future {
+    /// Sends messages unconditionally, bypassing mailbox limit and ignore its response.
+    fn immediately(self: Box<Self>);
+    /// Sends messages with blocking.
+    ///
+    /// # Panics
+    /// Panics when called in an `actix-rt`(`tokio`) context, or any `MsgRequest` has already been polled halfway.
+    fn blocking(self: Box<Self>) -> <Self as Future>::Output;
+}
+
+impl<S: BoxedRequestTrait + Unpin> BoxedRequestTrait for Box<S> {
+    fn immediately(self: Box<Self>) {
+        self.immediately()
+    }
+
+    fn blocking(self: Box<Self>) -> Self::Output {
+        self.blocking()
+    }
+}
+
 #[must_use = "You have to await on requests, call `blocking()` or `immediately()`, otherwise the message wont be delivered"]
 #[pin_project(project = MsgRequestsProj)]
 pub enum MsgRequests<'a, A, M>
@@ -75,26 +105,21 @@ where
     }
 }
 
-impl<'a, A, M, O> MsgRequests<'a, A, M>
+impl<'a, A, M, O> RequestTrait for MsgRequests<'a, A, M>
 where
     A: Actor + Handler<M>,
     A::Context: ToEnvelope<A, M>,
     M: Message<Result = O> + Send + Unpin + 'static,
     O: Send,
 {
-    /// Sends messages unconditionally, bypassing mailbox limit and ignore its response.
-    pub fn immediately(self) {
+    fn immediately(self) {
         if let Self::Init(l) = self {
-            l.into_iter().for_each(MsgRequest::immediately);
+            l.into_iter().for_each(RequestTrait::immediately);
         }
     }
 
-    /// Sends messages with blocking.
-    ///
-    /// # Panics
-    /// Panics when called in an `actix-rt`(`tokio`) context, or any `MsgRequest` has already been polled halfway.
     #[allow(clippy::missing_errors_doc)]
-    pub fn blocking(self) -> Vec<Result<O, MailboxError>> {
+    fn blocking(self) -> Vec<Result<O, MailboxError>> {
         if matches!(self, Self::Init(_)) {
             actix_rt::Runtime::new()
                 .expect("unable to create runtime")
@@ -102,6 +127,22 @@ where
         } else {
             panic!("already been polled halfway")
         }
+    }
+}
+
+impl<'a, A, M, O> BoxedRequestTrait for MsgRequests<'a, A, M>
+where
+    A: Actor + Handler<M>,
+    A::Context: ToEnvelope<A, M>,
+    M: Message<Result = O> + Send + Unpin + 'static,
+    O: Send,
+{
+    fn immediately(self: Box<Self>) {
+        (*self).immediately()
+    }
+
+    fn blocking(self: Box<Self>) -> Vec<Result<O, MailboxError>> {
+        (*self).blocking()
     }
 }
 
@@ -162,28 +203,21 @@ where
     }
 }
 
-impl<'a, A, M, O> MsgRequest<'a, A, M>
+impl<'a, A, M, O> RequestTrait for MsgRequest<'a, A, M>
 where
     A: Actor + Handler<M>,
     A::Context: ToEnvelope<A, M>,
-    M: Message<Result = O> + Send + 'static,
+    M: Message<Result = O> + Send + Unpin + 'static,
     O: Send,
 {
-    /// Sends a message unconditionally, bypassing mailbox limit and ignore its response.
-    #[allow(clippy::missing_panics_doc)]
-    pub fn immediately(self) {
+    fn immediately(self) {
         // If it's been polled or ready, don't do anything.
         if let Self::Initial { target, msg } = self {
             target.do_send(msg.unwrap());
         }
     }
 
-    /// Sends a message with blocking.
-    ///
-    /// # Panics
-    /// Panics when called in an `actix-rt`(`tokio`) context, or this `MsgRequest` has already been polled halfway.
-    #[allow(clippy::missing_errors_doc)]
-    pub fn blocking(self) -> Result<O, MailboxError> {
+    fn blocking(self) -> Result<O, MailboxError> {
         // If it's been polled or ready, don't do anything.
         if let Self::Initial { target, msg } = self {
             actix_rt::Runtime::new()
@@ -192,6 +226,22 @@ where
         } else {
             panic!("already been polled halfway")
         }
+    }
+}
+
+impl<'a, A, M, O> BoxedRequestTrait for MsgRequest<'a, A, M>
+where
+    A: Actor + Handler<M>,
+    A::Context: ToEnvelope<A, M>,
+    M: Message<Result = O> + Send + Unpin + 'static,
+    O: Send,
+{
+    fn immediately(self: Box<Self>) {
+        (*self).immediately()
+    }
+
+    fn blocking(self: Box<Self>) -> <Self as Future>::Output {
+        (*self).blocking()
     }
 }
 
@@ -224,12 +274,13 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::pin::Pin;
     use std::sync::mpsc::channel;
     use std::thread;
 
     use actix::{Actor, Context, Handler, Message, System};
 
-    use super::{MsgRequest, MsgRequests};
+    use super::{BoxedRequestTrait, MsgRequest, MsgRequests, RequestTrait};
 
     #[derive(Debug, Message)]
     #[rtype("usize")]
@@ -376,5 +427,23 @@ mod tests {
         );
 
         sys_thread.join().unwrap(); // sys thread should join and mustn't panic
+    }
+
+    #[actix::test]
+    async fn must_dyn_req_do() {
+        let addr = Echo::default().start();
+        let req: Box<dyn BoxedRequestTrait<Output = _>> =
+            Box::new(MsgRequest::new(&addr, Ping(42, false)));
+        req.immediately();
+        tokio::task::yield_now().await;
+        assert_eq!(addr.send(Query).await.unwrap(), 42, "message not delivered");
+    }
+
+    #[actix::test]
+    async fn must_dyn_req_await() {
+        let addr = Echo::default().start();
+        let req: Pin<Box<dyn BoxedRequestTrait<Output = _>>> =
+            Box::pin(MsgRequest::new(&addr, Ping(42, false)));
+        assert_eq!(req.await.unwrap(), 42, "response incorrect");
     }
 }
