@@ -21,26 +21,6 @@ trait RequestTrait: Future {
     fn blocking(self) -> <Self as Future>::Output;
 }
 
-trait BoxedRequestTrait: Future {
-    /// Sends messages unconditionally, bypassing mailbox limit and ignore its response.
-    fn immediately(self: Box<Self>);
-    /// Sends messages with blocking.
-    ///
-    /// # Panics
-    /// Panics when called in an `actix-rt`(`tokio`) context, or any `MsgRequest` has already been polled halfway.
-    fn blocking(self: Box<Self>) -> <Self as Future>::Output;
-}
-
-impl<S: BoxedRequestTrait + Unpin> BoxedRequestTrait for Box<S> {
-    fn immediately(self: Box<Self>) {
-        self.immediately()
-    }
-
-    fn blocking(self: Box<Self>) -> Self::Output {
-        self.blocking()
-    }
-}
-
 #[must_use = "You have to await on requests, call `blocking()` or `immediately()`, otherwise the message wont be delivered"]
 #[pin_project(project = MsgRequestsProj)]
 pub enum MsgRequests<'a, A, M>
@@ -130,22 +110,6 @@ where
     }
 }
 
-impl<'a, A, M, O> BoxedRequestTrait for MsgRequests<'a, A, M>
-where
-    A: Actor + Handler<M>,
-    A::Context: ToEnvelope<A, M>,
-    M: Message<Result = O> + Send + Unpin + 'static,
-    O: Send,
-{
-    fn immediately(self: Box<Self>) {
-        (*self).immediately()
-    }
-
-    fn blocking(self: Box<Self>) -> Vec<Result<O, MailboxError>> {
-        (*self).blocking()
-    }
-}
-
 impl<'a, A, M, O> Future for MsgRequests<'a, A, M>
 where
     A: Actor + Handler<M>,
@@ -229,22 +193,6 @@ where
     }
 }
 
-impl<'a, A, M, O> BoxedRequestTrait for MsgRequest<'a, A, M>
-where
-    A: Actor + Handler<M>,
-    A::Context: ToEnvelope<A, M>,
-    M: Message<Result = O> + Send + Unpin + 'static,
-    O: Send,
-{
-    fn immediately(self: Box<Self>) {
-        (*self).immediately()
-    }
-
-    fn blocking(self: Box<Self>) -> <Self as Future>::Output {
-        (*self).blocking()
-    }
-}
-
 impl<'a, A, M, O> Future for MsgRequest<'a, A, M>
 where
     A: Actor + Handler<M>,
@@ -280,7 +228,7 @@ mod tests {
 
     use actix::{Actor, Context, Handler, Message, System};
 
-    use super::{BoxedRequestTrait, MsgRequest, MsgRequests, RequestTrait};
+    use super::{MsgRequest, MsgRequests, RequestTrait};
 
     #[derive(Debug, Message)]
     #[rtype("usize")]
@@ -427,23 +375,5 @@ mod tests {
         );
 
         sys_thread.join().unwrap(); // sys thread should join and mustn't panic
-    }
-
-    #[actix::test]
-    async fn must_dyn_req_do() {
-        let addr = Echo::default().start();
-        let req: Box<dyn BoxedRequestTrait<Output = _>> =
-            Box::new(MsgRequest::new(&addr, Ping(42, false)));
-        req.immediately();
-        tokio::task::yield_now().await;
-        assert_eq!(addr.send(Query).await.unwrap(), 42, "message not delivered");
-    }
-
-    #[actix::test]
-    async fn must_dyn_req_await() {
-        let addr = Echo::default().start();
-        let req: Pin<Box<dyn BoxedRequestTrait<Output = _>>> =
-            Box::pin(MsgRequest::new(&addr, Ping(42, false)));
-        assert_eq!(req.await.unwrap(), 42, "response incorrect");
     }
 }
