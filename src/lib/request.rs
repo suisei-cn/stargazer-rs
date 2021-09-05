@@ -51,7 +51,9 @@ impl<'a, T: RequestTrait<'a>> RequestTraitBoxExt for T {
     // SAFETY
     // If `self` is in any of the Unpin state, it will immediately panic
     fn pinned_immediately(self: Pin<Box<Self>>) {
-        unsafe { Pin::into_inner_unchecked(self).immediately(); }
+        unsafe {
+            Pin::into_inner_unchecked(self).immediately();
+        }
     }
 
     // SAFETY
@@ -366,46 +368,11 @@ mod tests {
     use std::sync::mpsc::channel;
     use std::thread;
 
-    use actix::{Actor, Context, Handler, Message, System};
+    use actix::{Actor, System};
 
-    use crate::request::MsgRequestTuple;
+    use crate::tests::{Echo, Ping, Query};
 
-    use super::{MsgRequest, MsgRequestVec, RequestTrait};
-
-    #[derive(Debug, Message)]
-    #[rtype("usize")]
-    struct Ping(usize, bool);
-
-    #[derive(Debug, Message)]
-    #[rtype("usize")]
-    struct Query;
-
-    #[derive(Debug, Default)]
-    struct Echo(usize);
-
-    impl Actor for Echo {
-        type Context = Context<Self>;
-    }
-
-    impl Handler<Ping> for Echo {
-        type Result = usize;
-
-        fn handle(&mut self, msg: Ping, ctx: &mut Self::Context) -> Self::Result {
-            self.0 = msg.0;
-            if msg.1 {
-                System::current().stop();
-            }
-            msg.0
-        }
-    }
-
-    impl Handler<Query> for Echo {
-        type Result = usize;
-
-        fn handle(&mut self, msg: Query, ctx: &mut Self::Context) -> Self::Result {
-            self.0
-        }
-    }
+    use super::{MsgRequest, MsgRequestTuple, MsgRequestVec, RequestTrait};
 
     #[actix::test]
     async fn must_req_do() {

@@ -88,6 +88,12 @@ pub struct InstanceContext {
     arbiters: Vec<ArbiterContext>,
 }
 
+impl InstanceContext {
+    pub const fn instance_id(&self) -> Uuid {
+        self.instance_id
+    }
+}
+
 impl Default for InstanceContext {
     fn default() -> Self {
         Self {
@@ -118,11 +124,11 @@ impl InstanceContext {
     /// # Errors
     ///
     /// Raise an [`Error::Context`](Error::Context) when there's no such actor in the context.
-    pub fn send<'a, Target, Act, AddrT, MsgT, Output, R>(
+    pub fn send<'a, Target, Act, AddrT, MsgT, Output>(
         &'a self,
         target: Target,
         msg: &MsgT,
-    ) -> Result<impl RequestTrait + 'a>
+    ) -> Result<impl RequestTrait<Output = StdResult<HashMap<Uuid, Output>, MailboxError>> + 'a>
     where
         Target: MessageTarget<Actor = Act, Addr = AddrT>,
         Act: Actor + Handler<MsgT> + Handler<GetId>,
@@ -144,12 +150,79 @@ impl InstanceContext {
             .try_collect()?;
         Ok(
             MsgRequestTuple::new(MsgRequestVec::new(ids), MsgRequestVec::new(resps)).map(
-                |(ids, resps)| -> StdResult<_, MailboxError> {
+                |(ids, resps)| {
                     let ids: Vec<_> = ids.into_iter().try_collect()?;
                     let resps: Vec<_> = resps.into_iter().try_collect()?;
-                    Ok(ids.into_iter().zip(resps).collect_vec())
+                    Ok(ids.into_iter().zip(resps).collect())
                 },
             ),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use actix::Actor;
+    use uuid::Uuid;
+
+    use crate::tests::{
+        Adder, AdderTarget, Echo, Echo2, Echo2Target, EchoTarget, Ping, Ping2, Val,
+    };
+    use crate::{ArbiterContext, InstanceContext};
+
+    #[actix::test]
+    async fn must_arbiter_send() {
+        let ctx = ArbiterContext::new(Uuid::new_v4()).register_addr(Echo::default().start());
+        assert_eq!(
+            ctx.send(EchoTarget, Ping(41, false))
+                .expect("unable to find addr")
+                .await
+                .expect("unable to send message"),
+            41
+        );
+
+        assert!(
+            ctx.send(Echo2Target, Ping2(42, false)).is_err(),
+            "unexpected addr"
+        );
+        let ctx = ctx.register_addr(Echo2::default().start());
+        assert_eq!(
+            ctx.send(Echo2Target, Ping2(42, false))
+                .expect("unable to find addr")
+                .await
+                .expect("unable to send message"),
+            42
+        );
+    }
+
+    #[actix::test]
+    async fn must_instance_send() {
+        let mut inst = InstanceContext::new();
+        let arb_1 = ArbiterContext::new(inst.instance_id()).register_addr(Echo::default().start());
+        let arb_2 = ArbiterContext::new(inst.instance_id()).register_addr(Echo2::default().start());
+        inst.register(arb_1);
+        inst.register(arb_2);
+        assert!(
+            inst.send(EchoTarget, &Ping(41, false)).is_err(),
+            "unexpected addr"
+        );
+
+        let mut inst = InstanceContext::new();
+        let arb_1 = ArbiterContext::new(inst.instance_id())
+            .register_addr(Echo::default().start())
+            .register_addr(Adder::new(0).start());
+        let arb_2 = ArbiterContext::new(inst.instance_id())
+            .register_addr(Echo::default().start())
+            .register_addr(Adder::new(1).start());
+        inst.register(arb_1);
+        inst.register(arb_2);
+        let ans = inst
+            .send(AdderTarget, &Val(41))
+            .expect("unable to find addr")
+            .await
+            .expect("unable to send message");
+        assert_eq!(ans.len(), 2, "length mismatch");
+        assert_eq!(*ans.get(&Uuid::from_u128(0)).expect("missing key"), 41);
+        assert_eq!(*ans.get(&Uuid::from_u128(1)).expect("missing key"), 42);
     }
 }

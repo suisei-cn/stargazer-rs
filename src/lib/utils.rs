@@ -16,6 +16,14 @@ macro_rules! impl_message_target {
             type Addr = actix::Addr<$target_ty>;
         }
     };
+    (pub $name: ident, $target_ty: ty) => {
+        #[derive(Debug, Copy, Clone)]
+        pub struct $name;
+        impl $crate::context::MessageTarget for $name {
+            type Actor = $target_ty;
+            type Addr = actix::Addr<$target_ty>;
+        }
+    };
 }
 
 #[macro_export]
