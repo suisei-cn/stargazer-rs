@@ -1,15 +1,14 @@
 use std::mem::MaybeUninit;
 
-use mongodb::{bson::Document, Collection};
-
 use crate::scheduler::TaskFieldGetter;
 
 use super::models::TaskInfo;
+use crate::db::Collection;
 
 #[derive(Debug, Clone)]
 struct DummyTask {
     info: TaskInfo,
-    collection: Collection<Document>,
+    collection: Collection,
 }
 
 impl_task_field_getter!(DummyTask, info, collection);

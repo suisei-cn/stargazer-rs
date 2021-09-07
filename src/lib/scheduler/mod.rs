@@ -1,9 +1,9 @@
 use std::fmt::Debug;
 
 use actix::Actor;
-use mongodb::{bson::Document, Collection};
 use serde::{de::DeserializeOwned, Serialize};
 
+use crate::db::{Collection, Document};
 use crate::scheduler::models::TaskInfo;
 
 mod models;
@@ -17,7 +17,7 @@ pub trait TaskInfoGetter {
 }
 
 pub trait CollectionGetter {
-    fn get_collection(&self) -> &Collection<Document>;
+    fn get_collection(&self) -> &Collection;
 }
 
 pub trait TaskFieldGetter: TaskInfoGetter + CollectionGetter {}
@@ -32,7 +32,7 @@ pub trait Task: TaskFieldGetter + Actor + Debug {
         entry: Self::Entry,
         ctor: Self::Ctor,
         info: TaskInfo,
-        collection: Collection<Document>,
+        collection: Collection,
     ) -> Self;
 
     // Update the timestamp.

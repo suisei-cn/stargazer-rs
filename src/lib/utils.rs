@@ -52,7 +52,7 @@ macro_rules! impl_task_field_getter {
         }
 
         impl $crate::scheduler::CollectionGetter for $self {
-            fn get_collection(&self) -> &mongodb::Collection<mongodb::bson::Document> {
+            fn get_collection(&self) -> &$crate::db::Collection {
                 &self.$collection
             }
         }
