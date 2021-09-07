@@ -38,3 +38,23 @@ macro_rules! impl_stop_on_panic {
         }
     };
 }
+
+#[macro_export]
+macro_rules! impl_task_field_getter {
+    ($self: ident, $info: ident, $collection: ident) => {
+        impl $crate::scheduler::TaskInfoGetter for $self {
+            fn get_info(&self) -> TaskInfo {
+                self.$info
+            }
+            fn get_info_mut(&mut self) -> &mut $crate::scheduler::models::TaskInfo {
+                &mut self.$info
+            }
+        }
+
+        impl $crate::scheduler::CollectionGetter for $self {
+            fn get_collection(&self) -> &mongodb::Collection<mongodb::bson::Document> {
+                &self.$collection
+            }
+        }
+    };
+}

@@ -20,12 +20,14 @@ actix-web = "4.0.0-beta.8"
 actix-rt = "2.2"
 actix-service = "2.0"
 anyhow = "1.0"
+async-trait = "0.1"
 clap = "3.0.0-beta.4"
 config = { version = "0.11", features = ["toml", "json"], default-features = false }
 dirs = "3.0"
 futures = "0.3"
 itertools = "0.10"
 log = "0.4"
+mongodb = { version = "2.0.0-beta.3", features = ["bson-u2i"] }
 num_cpus = "1.13"
 parking_lot = "0.11"
 pin-project = "1.0"
@@ -34,4 +36,4 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
 tokio = { version = "1.11", features = ["rt", "net", "parking_lot", "signal", "sync", "time"] }
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "0.8", features = ["v4", "serde"] }
