@@ -8,6 +8,7 @@ use actix::{
     Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, ResponseActFuture, ResponseFuture,
     WrapFuture,
 };
+use log::info;
 use uuid::Uuid;
 
 use crate::common::ResponseWrapper;
@@ -93,7 +94,7 @@ where
                     maybe_res.map(|(info, entry)| {
                         // We've got an entry.
                         let uuid = info.uuid();
-                        println!("entry stolen: {:?}", entry);
+                        info!("entry stolen: {:?}", entry);
                         let actor = T::construct(entry, (*ctor_builder)(), info, collection);
                         let addr = actor.start();
                         (uuid, addr)
@@ -138,7 +139,7 @@ where
             .collect::<Vec<_>>()
             .into_iter()
             .for_each(|uuid| {
-                println!("Removing {} from actors", uuid);
+                info!("Removing {} from actors", uuid);
                 self.ctx.actors.remove(&uuid);
             });
     }

@@ -3,6 +3,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
+use log::info;
 use mongodb::bson::{self, bson, doc, Document};
 use mongodb::error::Result as DBResult;
 use mongodb::options::{FindOneAndUpdateOptions, ReturnDocument};
@@ -253,7 +254,7 @@ impl<T> ScheduleOp<T> {
             };
 
             // TODO randomly pick one entry from victim
-            println!("steal one entry");
+            info!("steal one entry");
 
             collection
                 .find_one_and_update(
@@ -300,7 +301,7 @@ impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
             },
         }
         .map(|res| {
-            println!("{:?}", res);
+            info!("{:?}", res);
             (
                 bson::from_document(res.clone()).unwrap(),
                 bson::from_document(res).unwrap(),
