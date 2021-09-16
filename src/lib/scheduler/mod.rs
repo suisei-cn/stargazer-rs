@@ -8,7 +8,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use models::TaskInfo;
 use ops::UpdateTSOp;
 
-use crate::db::{Collection, DBOperation, Document, DBResult};
+use crate::db::{Collection, DBOperation, DBResult, Document};
 
 mod actor;
 mod config;

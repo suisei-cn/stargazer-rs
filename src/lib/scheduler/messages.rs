@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
+use crate::db::DBResult;
 use actix::{Actor, Addr, Message, ResponseFuture};
 use uuid::Uuid;
-use crate::db::DBResult;
 
 #[derive(Debug, Copy, Clone)]
 pub struct TrySchedule<T>(PhantomData<T>);

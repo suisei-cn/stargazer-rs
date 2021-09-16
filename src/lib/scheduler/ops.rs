@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::db::{DBOperation, Collection};
+use crate::db::{Collection, DBOperation};
 
 use super::models::{SchedulerMeta, TaskInfo};
 
