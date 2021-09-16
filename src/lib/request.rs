@@ -7,6 +7,7 @@ use std::task::{Context, Poll};
 use actix::dev::{Request, ToEnvelope};
 use actix::MailboxError;
 use actix::{Actor, Addr, Handler, Message};
+use actix_web::rt::Runtime;
 use futures::future::{Join, JoinAll};
 use futures::ready;
 use pin_project::pin_project;
@@ -109,7 +110,7 @@ where
 
     fn blocking(self) -> <Self as Future>::Output {
         if matches!(self, Self::Init(_, _)) {
-            actix_rt::Runtime::new()
+            Runtime::new()
                 .expect("unable to create runtime")
                 .block_on(self)
         } else {
@@ -164,7 +165,7 @@ impl<'a, R1: RequestTrait<'a>, R2: RequestTrait<'a>> RequestTrait<'_> for MsgReq
 
     fn blocking(self) -> (R1::Output, R2::Output) {
         if matches!(self, Self::Init(_, _)) {
-            actix_rt::Runtime::new()
+            Runtime::new()
                 .expect("unable to create runtime")
                 .block_on(self)
         } else {
@@ -248,7 +249,7 @@ impl<'a, R: RequestTrait<'a>> RequestTrait<'a> for MsgRequestVec<R> {
     #[allow(clippy::missing_errors_doc)]
     fn blocking(self) -> Vec<R::Output> {
         if matches!(self, Self::Init(_)) {
-            actix_rt::Runtime::new()
+            Runtime::new()
                 .expect("unable to create runtime")
                 .block_on(self)
         } else {
@@ -327,7 +328,7 @@ where
     fn blocking(self) -> Result<O, MailboxError> {
         // If it's been polled or ready, don't do anything.
         if let Self::Initial { target, msg } = self {
-            actix_rt::Runtime::new()
+            Runtime::new()
                 .expect("unable to create runtime")
                 .block_on(target.send(msg.unwrap()))
         } else {
