@@ -3,9 +3,14 @@ use std::marker::PhantomData;
 
 use actix::{Actor, Addr, Message, ResponseFuture};
 use uuid::Uuid;
+use crate::db::DBResult;
 
 #[derive(Debug, Copy, Clone)]
-pub struct TrySteal<T>(PhantomData<T>);
+pub struct TrySchedule<T>(PhantomData<T>);
+
+impl<T: Actor> Message for TrySchedule<T> {
+    type Result = DBResult<Option<(Uuid, Addr<T>)>>;
+}
 
 #[derive(Debug, Copy, Clone, Message)]
 #[rtype("uuid::Uuid")]
@@ -26,20 +31,16 @@ where
     __marker_2: PhantomData<Output>,
 }
 
-impl<T> Default for TrySteal<T> {
+impl<T> Default for TrySchedule<T> {
     fn default() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<T> TrySteal<T> {
+impl<T> TrySchedule<T> {
     pub fn new() -> Self {
         Default::default()
     }
-}
-
-impl<T: Actor> Message for TrySteal<T> {
-    type Result = Option<(Uuid, Addr<T>)>;
 }
 
 impl<A, F, Output> ActorsIter<A, F, Output>

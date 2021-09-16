@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use crate::error::{Error, Result};
 use crate::request::{MsgRequest, MsgRequestTuple, MsgRequestVec, RequestTrait};
+use crate::scheduler::messages::GetId;
 use crate::utils::TypeEq;
-use crate::worker::messages::GetId;
 
 type StdResult<T, E> = std::result::Result<T, E>;
 

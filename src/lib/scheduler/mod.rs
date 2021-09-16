@@ -1,11 +1,18 @@
 use std::fmt::Debug;
+use std::future::Future;
+use std::pin::Pin;
 
 use actix::Actor;
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::db::{Collection, Document};
-use crate::scheduler::models::TaskInfo;
+use models::TaskInfo;
+use ops::UpdateTSOp;
 
+use crate::db::{Collection, DBOperation, Document, DBResult};
+
+mod actor;
+mod config;
+pub mod messages;
 mod models;
 mod ops;
 #[cfg(test)]
@@ -37,10 +44,10 @@ pub trait Task: TaskFieldGetter + Actor + Debug {
 
     // Update the timestamp.
     // Returns `false` if the resource bound to this worker is replaced by another worker or deleted
-    // fn update_timestamp(&self) -> Pin<Box<dyn Future<Output = DBResult<bool>>>> {
-    //     let collection = self.get_collection().clone();
-    //     let steal_info = self.get_info().clone();
-    //     let op = UpdateTSOp::new(steal_info);
-    //     Box::pin(async move { op.execute(&collection).await })
-    // }
+    fn update_timestamp(&self) -> Pin<Box<dyn Future<Output = DBResult<bool>>>> {
+        let collection = self.get_collection().clone();
+        let task_info = self.get_info();
+        let op = UpdateTSOp::new(task_info);
+        Box::pin(async move { op.execute(&collection).await })
+    }
 }

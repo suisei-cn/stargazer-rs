@@ -22,7 +22,6 @@ mod event_source;
 mod model;
 pub mod request;
 mod server;
-pub mod worker;
 
 mod common;
 mod db;

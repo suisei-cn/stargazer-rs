@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 pub(crate) use mongodb::bson::Document;
-use mongodb::error::Result as DBResult;
-pub(crate) use mongodb::Collection as DBCollection;
+pub(crate) use mongodb::error::Result as DBResult;
 
 pub(crate) type Collection = mongodb::Collection<mongodb::bson::Document>;
 

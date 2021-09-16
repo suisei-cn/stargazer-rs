@@ -2,7 +2,7 @@ use actix::{Actor, Context, Handler, Message, System};
 use uuid::Uuid;
 
 use crate::common::ResponseWrapper;
-use crate::worker::messages::GetId;
+use crate::scheduler::messages::GetId;
 
 #[derive(Debug, Copy, Clone, Message)]
 #[rtype("usize")]
