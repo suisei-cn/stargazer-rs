@@ -1,17 +1,32 @@
+use std::ffi::OsStr;
 use std::net::IpAddr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use config::Source;
+use crate::config::provider::ConfigFile;
+use figment::providers::{Env, Format, Json, Toml};
+use figment::value::{Dict, Map};
+use figment::{Error, Figment, Metadata, Profile, Provider};
 use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::error::ConfigError;
+mod provider;
+#[cfg(test)]
+mod tests;
 
 /// Contains all configuration to run the application.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct Config {
-    #[serde(rename = "HTTP")]
     http: HTTP,
+}
+
+// TODO workaround before https://github.com/serde-rs/serde/pull/2056 is merged
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+// #[serde(tag = "enabled")]
+pub enum HTTP {
+    // #[serde(rename = false)]
+    Disabled,
+    // #[serde(rename = true)]
+    Enabled { host: IpAddr, port: u16 },
 }
 
 impl Config {
@@ -28,40 +43,23 @@ impl Config {
     ///
     /// Returns [`ConfigError`](ConfigError) if there's no config source available or there's any parsing error.
     #[allow(clippy::missing_panics_doc)]
-    pub fn new(config: Option<&Path>) -> Result<Self, ConfigError> {
+    pub fn new(config: Option<&Path>) -> Result<Self, Error> {
         let config = if let Some(config) = config {
-            config::Config::new().with_merged(config::File::from(config).required(false))?
+            Figment::new().merge(ConfigFile::file(config))
         } else {
-            config::Config::new()
-                .with_merged(config::File::with_name("/etc/stargazer/config").required(false))?
-                .with_merged(
-                    config::File::from(
-                        dirs::config_dir()
-                            .unwrap_or_default()
-                            .join("stargazer/config"),
-                    )
-                    .required(false),
-                )?
-                .with_merged(config::File::with_name("config").required(false))?
+            Figment::new()
+                .merge(ConfigFile::file("/etc/stargazer/config"))
+                .merge(ConfigFile::file(
+                    dirs::config_dir()
+                        .unwrap_or_default()
+                        .join("stargazer/config"),
+                ))
+                .merge(ConfigFile::file("config"))
         }
-        .with_merged(config::Environment::with_prefix("stargazer"))?;
+        .merge(Env::prefixed("STARGAZER_").split("_"));
 
-        if config.collect().unwrap().is_empty() {
-            return Err(ConfigError::Missing);
-        }
-
-        Ok(config.try_into()?)
+        Ok(config.extract()?)
     }
-}
-
-// TODO workaround before https://github.com/serde-rs/serde/pull/2056 is merged
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-// #[serde(tag = "enabled")]
-pub enum HTTP {
-    // #[serde(rename = false)]
-    Disabled,
-    // #[serde(rename = true)]
-    Enabled { host: IpAddr, port: u16 },
 }
 
 impl Serialize for HTTP {

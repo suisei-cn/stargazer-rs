@@ -22,7 +22,7 @@ actix-service = "2.0"
 anyhow = "1.0"
 async-trait = "0.1"
 clap = "3.0.0-beta.4"
-config = { version = "0.11", features = ["toml", "json"], default-features = false }
+figment = { version = "0.10", features = ["toml", "json", "env"] }
 dirs = "4.0"
 futures = "0.3"
 itertools = "0.10"
@@ -38,3 +38,6 @@ serde_json = "1.0"
 thiserror = "1.0"
 tokio = { version = "1.11", features = ["rt", "net", "parking_lot", "signal", "sync", "time"] }
 uuid = { version = "0.8", features = ["v4", "serde"] }
+
+[dev-dependencies]
+figment = { version = "0.10", features = ["toml", "json", "env", "test"] }
