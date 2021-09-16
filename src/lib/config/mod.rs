@@ -1,13 +1,12 @@
-use std::ffi::OsStr;
 use std::net::IpAddr;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use crate::config::provider::ConfigFile;
-use figment::providers::{Env, Format, Json, Toml};
-use figment::value::{Dict, Map};
-use figment::{Error, Figment, Metadata, Profile, Provider};
+use figment::providers::Env;
+use figment::{Error, Figment};
 use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use provider::ConfigFile;
 
 mod provider;
 #[cfg(test)]
@@ -58,7 +57,7 @@ impl Config {
         }
         .merge(Env::prefixed("STARGAZER_").split("_"));
 
-        Ok(config.extract()?)
+        config.extract()
     }
 }
 

@@ -4,13 +4,6 @@ use std::path::{Path, PathBuf};
 use figment::providers::{Format, Json, Toml};
 use figment::value::{Dict, Map};
 use figment::{Error, Metadata, Profile, Provider};
-use serde::{Deserializer, Serializer};
-
-enum ConfigFileInner {
-    Json(Json),
-    Toml(Toml),
-    None,
-}
 
 pub struct ConfigFile {
     inner: Option<Box<dyn Provider>>,
