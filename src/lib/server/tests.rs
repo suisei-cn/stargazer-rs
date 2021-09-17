@@ -54,45 +54,73 @@ mod arb_handler {
 }
 
 mod killer {
+    use std::thread;
     use std::time::Duration;
 
-    use actix::{AsyncContext, System, SystemService};
+    use actix::{AsyncContext, System};
     use tokio::sync::mpsc::unbounded_channel;
     use tokio::time::{sleep, timeout};
 
-    use crate::server::killer::Kill;
     use crate::KillerActor;
 
     #[test]
     fn must_kill_system() {
-        let (tx, mut rx) = unbounded_channel();
+        // spawn a new thread to avoid polluting thread local storage
+        thread::spawn(|| {
+            let (tx, mut rx) = unbounded_channel();
 
-        {
+            {
+                let sys = System::new();
+                sys.block_on(async {
+                    // clone the channel so that it won't be closed
+                    let tx = tx.clone();
+
+                    actix::spawn(async move {
+                        sleep(Duration::from_millis(100)).await;
+                        // Killer failed to reap this system, notify main thread
+                        tx.send(());
+                        System::current().stop(); // cleanup
+                    });
+
+                    KillerActor::start(None);
+                    KillerActor::kill(true);
+                });
+                sys.run(); // join system
+            }
+
             let sys = System::new();
             sys.block_on(async {
-                // clone the channel so that it won't be closed
-                let tx = tx.clone();
-
-                actix::spawn(async move {
-                    sleep(Duration::from_millis(100)).await;
-                    // Killer failed to reap this system, notify main thread
-                    tx.send(());
-                    System::current().stop(); // cleanup
-                });
-
-                let addr = KillerActor::from_registry();
-                addr.do_send(Kill::new(true));
+                // Here we spawned a future and use recv instead of blocking_recv
+                // because we don't want the test stuck forever if it's failed.
+                let fut = timeout(Duration::from_millis(150), rx.recv());
+                assert!(fut.await.is_err(), "system is not killed");
             });
-            sys.run(); // join system
-        }
+        })
+        .join()
+        .unwrap()
+    }
 
-        let sys = System::new();
-        sys.block_on(async {
-            // Here we spawned a future and use recv instead of blocking_recv
-            // because we don't want the test stuck forever if it's failed.
-            let fut = timeout(Duration::from_millis(150), rx.recv());
-            assert!(fut.await.is_err(), "system is not killed");
-        });
+    #[test]
+    fn must_not_create_multiple_killer() {
+        // spawn a new thread to avoid polluting thread local storage
+        if let Err(e) = thread::spawn(|| {
+            let sys = System::new();
+            sys.block_on(async {
+                for _ in 0..2 {
+                    KillerActor::start(None);
+                }
+                System::current().stop()
+            });
+        })
+        .join()
+        {
+            assert_eq!(
+                e.downcast_ref::<&'static str>().expect("unexpected panic"),
+                &"cannot run two killers on the same arbiter"
+            );
+        } else {
+            panic!("multiple killer is created");
+        }
     }
 }
 
