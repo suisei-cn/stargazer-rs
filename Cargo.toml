@@ -24,7 +24,7 @@ dirs = "4.0"
 futures = "0.3"
 itertools = "0.10"
 log = "0.4"
-mongodb = { version = "2.0.0-beta.3", features = ["bson-u2i"] }
+mongodb = "2.0.0"
 num_cpus = "1.13"
 parking_lot = "0.11"
 pin-project = "1.0"
