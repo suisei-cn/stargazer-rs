@@ -99,8 +99,8 @@ impl DBOperation for GetAllTasksCount {
 #[derive(Debug, Clone)]
 pub struct GetWorkerInfoOp {
     base_query: Document,
-    retry_ts: i64,
-    parent_meta: SchedulerMeta,
+    since_ts: i64,
+    parent_id: Uuid,
 }
 
 #[async_trait]
@@ -111,8 +111,8 @@ impl DBOperation for GetWorkerInfoOp {
         let filter_query = doc! {
             "$match": {
                 "$and": [
-                    {"parent_uuid": {"$ne": self.parent_meta.id().to_string()}},   // exclude current worker
-                    {"timestamp": {"$gte": self.retry_ts}},   // updated recently
+                    {"parent_uuid": {"$ne": self.parent_id.to_string()}},   // exclude current worker
+                    {"timestamp": {"$gte": self.since_ts}},   // updated recently
                     self.base_query.clone()
                 ]
             }
@@ -122,22 +122,60 @@ impl DBOperation for GetWorkerInfoOp {
                 "_id": "$parent_uuid", "count": {"$sum": 1}
             }
         };
-        Ok(collection
+        collection
             .aggregate([filter_query, count_parent_uuid], None)
             .await?
             .map(|doc| doc.map(|doc| -> WorkerInfo { bson::from_document(doc).unwrap() }))
             .try_collect()
-            .await?)
+            .await
     }
 }
 
 impl GetWorkerInfoOp {
-    pub fn new(base_query: Document, retry_ts: i64, parent_meta: SchedulerMeta) -> Self {
+    pub fn new(base_query: Document, retry_ts: i64, parent_id: Uuid) -> Self {
         GetWorkerInfoOp {
             base_query,
-            retry_ts,
-            parent_meta,
+            since_ts: retry_ts,
+            parent_id,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GetTasksOnWorkerOp {
+    base_query: Document,
+    since_ts: i64,
+    worker: Uuid,
+}
+
+impl GetTasksOnWorkerOp {
+    pub fn new(base_query: Document, since_ts: i64, worker: Uuid) -> Self {
+        GetTasksOnWorkerOp {
+            base_query,
+            since_ts,
+            worker,
+        }
+    }
+}
+
+#[async_trait]
+impl DBOperation for GetTasksOnWorkerOp {
+    type Result = Vec<TaskInfo>;
+
+    async fn execute(&self, collection: &Collection) -> DBResult<Self::Result> {
+        let filter_query = doc! {
+            "$and": [
+                {"parent_uuid": self.worker.to_string()},   // select worker
+                {"timestamp": {"$gte": self.since_ts}},   // updated recently
+                self.base_query.clone()
+            ]
+        };
+        collection
+            .find(filter_query, None)
+            .await?
+            .map(|doc| doc.map(|doc| -> TaskInfo { bson::from_document(doc).unwrap() }))
+            .try_collect()
+            .await
     }
 }
 
@@ -146,7 +184,7 @@ pub struct ScheduleOp<T> {
     mode: ScheduleMode,
     query: Document,
     update: Document,
-    retry_ts: i64,
+    since_ts: i64,
     parent_meta: SchedulerMeta,
     __marker: PhantomData<T>,
 }
@@ -158,18 +196,18 @@ impl<T> ScheduleOp<T> {
         parent_meta: SchedulerMeta,
         ago: Duration,
     ) -> Self {
-        let retry_ts = (SystemTime::now() - ago)
+        let since_ts = (SystemTime::now() - ago)
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as i64;
-        let ts = SystemTime::now()
+        let now_ts = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as i64;
         let uuid = Uuid::new_v4();
         let update = doc! {
             "$set": {
-                "timestamp": ts,
+                "timestamp": now_ts,
                 "uuid": uuid.to_string(),
                 "parent_uuid": parent_meta.id().to_string()
             }
@@ -178,7 +216,7 @@ impl<T> ScheduleOp<T> {
             mode,
             query,
             update,
-            retry_ts,
+            since_ts,
             parent_meta,
             __marker: PhantomData::default(),
         }
@@ -192,7 +230,7 @@ impl<T> ScheduleOp<T> {
             bson!([
                 {
                     "timestamp": {
-                        "$lt": self.retry_ts
+                        "$lt": self.since_ts
                     }
                 },
                 {
@@ -219,28 +257,27 @@ impl<T> ScheduleOp<T> {
         let entries_count = GetAllTasksCount::new(self.query.clone())
             .execute(collection)
             .await?;
-        let workers = GetWorkerInfoOp::new(self.query.clone(), self.retry_ts, self.parent_meta)
-            .execute(collection)
-            .await?;
+        let workers =
+            GetWorkerInfoOp::new(self.query.clone(), self.since_ts, self.parent_meta.id())
+                .execute(collection)
+                .await?;
 
         // allowed entries per worker is [expected, expected+1].
         let self_count = self.parent_meta.actor_count() as u64;
         let workers_count = workers.len() as u64;
         let expected = entries_count / (workers_count + 1);
+        let threshold = if self_count < expected {
+            // If we are underloaded (self < expected), we may steal from those workers.
+            expected
+        } else {
+            // Those are the overloaded ones, steal them if (self == expected).
+            expected + 1
+        };
 
         let victim_worker = if self_count <= expected {
             workers
                 .into_iter()
-                .filter(|worker| {
-                    worker.count
-                        > if self_count < expected {
-                            // If we are underloaded (self < expected), we may steal from those workers.
-                            expected
-                        } else {
-                            // Those are the overloaded ones, steal them if (self == expected).
-                            expected + 1
-                        }
-                })
+                .filter(|worker| worker.count > threshold)
                 .collect::<Vec<_>>()
                 .choose(&mut rand::thread_rng())
                 .cloned()
@@ -249,25 +286,26 @@ impl<T> ScheduleOp<T> {
         };
 
         Ok(if let Some(victim_worker) = victim_worker {
-            let query = doc! {
-                "parent_uuid": victim_worker.id.to_string()
-            };
+            let tasks =
+                GetTasksOnWorkerOp::new(self.query.clone(), self.since_ts, victim_worker.id)
+                    .execute(collection)
+                    .await?;
 
-            // TODO randomly pick one entry from victim
-            info!("steal one entry");
-
-            collection
-                .find_one_and_update(
-                    query,
-                    self.update.clone(),
-                    Some(
-                        FindOneAndUpdateOptions::builder()
-                            .return_document(ReturnDocument::After)
-                            .build(),
-                    ),
-                )
-                .await?
-                .map_or(ScheduleResult::Conflict, ScheduleResult::Some)
+            if tasks.len() as u64 > threshold {
+                info!("steal one entry");
+                let victim_task = tasks.choose(&mut rand::thread_rng()).unwrap();
+                collection
+                    .find_one_and_update(
+                        bson::to_document(victim_task).unwrap(),
+                        self.update.clone(),
+                        None,
+                    )
+                    .await?
+                    .map_or(ScheduleResult::Conflict, ScheduleResult::Some)
+            } else {
+                // target worker has insufficient tasks, indicating a steal conflict
+                ScheduleResult::Conflict
+            }
         } else {
             // no need to steal anything
             ScheduleResult::None
