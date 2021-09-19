@@ -75,11 +75,12 @@ where
 {
     type Result = ResponseActFuture<Self, DBResult<Option<(Uuid, Addr<T>)>>>;
 
-    fn handle(&mut self, _msg: TrySchedule<T>, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _msg: TrySchedule<T>, ctx: &mut Self::Context) -> Self::Result {
         let collection = self.collection.clone();
         let config = self.config;
         let ctor_builder = self.ctor_builder.clone();
         let ctx_meta = SchedulerMeta::from(&self.ctx);
+        let scheduler_addr = ctx.address();
         Box::pin(
             async move {
                 ScheduleOp::new(
@@ -95,7 +96,7 @@ where
                         // We've got an entry.
                         let uuid = info.uuid();
                         info!("entry stolen: {:?}", entry);
-                        let actor = T::construct(entry, (*ctor_builder)(), info, collection);
+                        let actor = T::construct(entry, (*ctor_builder)(), scheduler_addr, info, collection);
                         let addr = actor.start();
                         (uuid, addr)
                     })

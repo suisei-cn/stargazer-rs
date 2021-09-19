@@ -7,6 +7,7 @@ impl<T> TypeEq for T {
 }
 
 #[macro_export]
+/// impl_message_target!((pub) ActorTarget, Actor)
 macro_rules! impl_message_target {
     ($name: ident, $target_ty: ty) => {
         #[derive(Debug, Copy, Clone)]
@@ -27,6 +28,7 @@ macro_rules! impl_message_target {
 }
 
 #[macro_export]
+/// impl_stop_on_panic!(Actor)
 macro_rules! impl_stop_on_panic {
     ($name: ident) => {
         impl Drop for $name {
@@ -40,8 +42,9 @@ macro_rules! impl_stop_on_panic {
 }
 
 #[macro_export]
+/// impl_task_field_getter!(Actor, info, collection, scheduler)
 macro_rules! impl_task_field_getter {
-    ($self: ident, $info: ident, $collection: ident) => {
+    ($self: ident, $info: ident, $collection: ident, $scheduler: ident) => {
         impl $crate::scheduler::TaskInfoGetter for $self {
             fn get_info(&self) -> TaskInfo {
                 self.$info
@@ -54,6 +57,12 @@ macro_rules! impl_task_field_getter {
         impl $crate::scheduler::CollectionGetter for $self {
             fn get_collection(&self) -> &$crate::db::Collection {
                 &self.$collection
+            }
+        }
+
+        impl $crate::scheduler::SchedulerGetter for $self {
+            fn get_scheduler(&self) -> &actix::Addr<$crate::scheduler::actor::ScheduleActor<Self>> {
+                &self.$scheduler
             }
         }
     };

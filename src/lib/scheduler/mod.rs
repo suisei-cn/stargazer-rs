@@ -2,15 +2,16 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
 
-use actix::Actor;
+use actix::{Actor, Addr, Context};
 use serde::{de::DeserializeOwned, Serialize};
 
 use models::TaskInfo;
 use ops::UpdateTSOp;
 
 use crate::db::{Collection, DBOperation, DBResult, Document};
+use actor::ScheduleActor;
 
-mod actor;
+pub mod actor;
 mod config;
 pub mod messages;
 mod models;
@@ -27,17 +28,22 @@ pub trait CollectionGetter {
     fn get_collection(&self) -> &Collection;
 }
 
-pub trait TaskFieldGetter: TaskInfoGetter + CollectionGetter {}
+pub trait SchedulerGetter {
+    fn get_scheduler(&self) -> &Addr<ScheduleActor<Self>> where Self: Task;
+}
 
-impl<T> TaskFieldGetter for T where T: TaskInfoGetter + CollectionGetter {}
+pub trait TaskFieldGetter: TaskInfoGetter + CollectionGetter + SchedulerGetter {}
 
-pub trait Task: TaskFieldGetter + Actor + Debug {
+impl<T> TaskFieldGetter for T where T: TaskInfoGetter + CollectionGetter + SchedulerGetter{}
+
+pub trait Task: TaskFieldGetter + Actor<Context=Context<Self>> + Debug {
     type Entry: Debug + Serialize + DeserializeOwned + Send + Sync;
     type Ctor;
     fn query() -> Document;
     fn construct(
         entry: Self::Entry,
         ctor: Self::Ctor,
+        scheduler: Addr<ScheduleActor<Self>>,
         info: TaskInfo,
         collection: Collection,
     ) -> Self;
