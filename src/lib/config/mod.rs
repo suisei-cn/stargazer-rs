@@ -43,19 +43,21 @@ impl Config {
     /// Returns [`ConfigError`](ConfigError) if there's no config source available or there's any parsing error.
     #[allow(clippy::missing_panics_doc)]
     pub fn new(config: Option<&Path>) -> Result<Self, Error> {
-        let config = if let Some(config) = config {
-            Figment::new().merge(ConfigFile::file(config))
-        } else {
-            Figment::new()
-                .merge(ConfigFile::file("/etc/stargazer/config"))
-                .merge(ConfigFile::file(
-                    dirs::config_dir()
-                        .unwrap_or_default()
-                        .join("stargazer/config"),
-                ))
-                .merge(ConfigFile::file("config"))
-        }
-        .merge(Env::prefixed("STARGAZER_").split("_"));
+        let config = config
+            .map_or_else(
+                || {
+                    Figment::new()
+                        .merge(ConfigFile::file("/etc/stargazer/config"))
+                        .merge(ConfigFile::file(
+                            dirs::config_dir()
+                                .unwrap_or_default()
+                                .join("stargazer/config"),
+                        ))
+                        .merge(ConfigFile::file("config"))
+                },
+                |config| Figment::new().merge(ConfigFile::file(config)),
+            )
+            .merge(Env::prefixed("STARGAZER_").split("_"));
 
         config.extract()
     }

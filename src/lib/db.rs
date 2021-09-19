@@ -1,8 +1,8 @@
 use async_trait::async_trait;
-pub(crate) use mongodb::bson::Document;
-pub(crate) use mongodb::error::Result as DBResult;
+pub use mongodb::bson::Document;
+pub use mongodb::error::Result as DBResult;
 
-pub(crate) type Collection = mongodb::Collection<mongodb::bson::Document>;
+pub type Collection = mongodb::Collection<mongodb::bson::Document>;
 
 #[async_trait]
 pub trait DBOperation {

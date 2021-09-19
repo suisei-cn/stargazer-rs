@@ -19,10 +19,14 @@ impl Kill {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct KillerActor(Option<ActixServer>);
 
 impl KillerActor {
+    /// Start `KillerActor` on the current arbiter with given server handler.
+    ///
+    /// # Panics
+    /// Panics when there's already a `KillerActor` on the same arbiter.
     pub fn start(srv: Option<ActixServer>) {
         let act = Self(srv);
         let addr = act.start();
@@ -37,7 +41,7 @@ impl KillerActor {
     pub fn kill(graceful: bool) {
         LOCAL_KILLER.with(|f| {
             if let Some(killer) = f.replace(None) {
-                killer.do_send(Kill::new(graceful))
+                killer.do_send(Kill::new(graceful));
             }
         });
     }

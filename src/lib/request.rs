@@ -402,7 +402,7 @@ mod tests {
                 let addr = Echo::default().start();
                 tx.send(addr).unwrap();
             });
-            sys.run(); // join system
+            sys.run().unwrap(); // join system
         });
 
         let addr = rx.recv().unwrap();
@@ -470,7 +470,7 @@ mod tests {
                 let addr = Echo::default().start();
                 tx.send(addr).unwrap();
             });
-            sys.run(); // join system
+            sys.run().unwrap(); // join system
         });
 
         let addr = rx.recv().unwrap();
@@ -548,7 +548,7 @@ mod tests {
                 let addr = Echo::default().start();
                 tx.send(addr).unwrap();
             });
-            sys.run(); // join system
+            sys.run().unwrap(); // join system
         });
 
         let addr = rx.recv().unwrap();

@@ -13,8 +13,6 @@ use stargazer_lib::{
     ServerMode,
 };
 
-mod app;
-
 #[derive(Clap)]
 #[clap(
     version = "1.0",
@@ -39,7 +37,7 @@ impl Actor for PanicActor {
     type Context = Context<Self>;
     fn started(&mut self, ctx: &mut Self::Context) {
         if self.timed_panic {
-            ctx.run_later(Duration::from_secs(5), |act, ctx| {
+            ctx.run_later(Duration::from_secs(5), |_act, _ctx| {
                 panic!("boom");
             });
         }
@@ -53,9 +51,9 @@ struct PanicSignal;
 impl Handler<PanicSignal> for PanicActor {
     type Result = ();
 
-    fn handle(&mut self, msg: PanicSignal, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _msg: PanicSignal, _ctx: &mut Self::Context) -> Self::Result {
         println!("inst {} arb {}", self.instance_id, self.arbiter_id);
-        panic!("inst {} arb {}", self.instance_id, self.arbiter_id)
+        panic!("inst {} arb {}", self.instance_id, self.arbiter_id);
     }
 }
 
@@ -63,7 +61,7 @@ impl_stop_on_panic!(PanicActor);
 
 #[actix_web::get("/panic")]
 async fn panic_serv(ctx: actix_web::web::Data<ArbiterContext>) -> impl Responder {
-    ctx.send(PanicTarget, PanicSignal).unwrap().await;
+    let _ = ctx.send(PanicTarget, PanicSignal).unwrap().await;
     "ok"
 }
 
@@ -93,6 +91,7 @@ async fn main() {
     // })
     .run(ServerMode::NoHTTP)
     .unwrap()
-    .await;
+    .await
+    .unwrap();
     println!("{:?}", config);
 }

@@ -39,10 +39,10 @@ pub struct SchedulerMeta {
 }
 
 impl SchedulerMeta {
-    pub fn id(&self) -> Uuid {
+    pub const fn id(&self) -> Uuid {
         self.id
     }
-    pub fn actor_count(&self) -> usize {
+    pub const fn actor_count(&self) -> usize {
         self.actor_count
     }
 }

@@ -22,8 +22,8 @@ pub struct UpdateTSOp {
 }
 
 impl UpdateTSOp {
-    pub fn new(task_info: TaskInfo) -> Self {
-        UpdateTSOp { task_info }
+    pub const fn new(task_info: TaskInfo) -> Self {
+        Self { task_info }
     }
 }
 
@@ -70,7 +70,7 @@ pub struct WorkerInfo {
 
 impl Default for ScheduleMode {
     fn default() -> Self {
-        ScheduleMode::Auto
+        Self::Auto
     }
 }
 
@@ -80,8 +80,8 @@ pub struct GetAllTasksCount {
 }
 
 impl GetAllTasksCount {
-    pub fn new(base_query: Document) -> Self {
-        GetAllTasksCount { base_query }
+    pub const fn new(base_query: Document) -> Self {
+        Self { base_query }
     }
 }
 
@@ -132,8 +132,8 @@ impl DBOperation for GetWorkerInfoOp {
 }
 
 impl GetWorkerInfoOp {
-    pub fn new(base_query: Document, retry_ts: i64, parent_id: Uuid) -> Self {
-        GetWorkerInfoOp {
+    pub const fn new(base_query: Document, retry_ts: i64, parent_id: Uuid) -> Self {
+        Self {
             base_query,
             since_ts: retry_ts,
             parent_id,
@@ -149,8 +149,8 @@ pub struct GetTasksOnWorkerOp {
 }
 
 impl GetTasksOnWorkerOp {
-    pub fn new(base_query: Document, since_ts: i64, worker: Uuid) -> Self {
-        GetTasksOnWorkerOp {
+    pub const fn new(base_query: Document, since_ts: i64, worker: Uuid) -> Self {
+        Self {
             base_query,
             since_ts,
             worker,
@@ -280,7 +280,7 @@ impl<T> ScheduleOp<T> {
                 .filter(|worker| worker.count > threshold)
                 .collect::<Vec<_>>()
                 .choose(&mut rand::thread_rng())
-                .cloned()
+                .copied()
         } else {
             None
         };

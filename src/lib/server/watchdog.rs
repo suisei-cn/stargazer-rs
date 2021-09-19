@@ -11,6 +11,10 @@ thread_local! {
 pub struct WatchdogActor(UnboundedSender<()>);
 
 impl WatchdogActor {
+    /// Start `WatchdogActor` on the current arbiter with given signal sender.
+    ///
+    /// # Panics
+    /// Panics when there's already a `WatchdogActor` on the same arbiter.
     pub fn start(tx: UnboundedSender<()>) {
         let act = Self(tx);
         let addr = act.start();

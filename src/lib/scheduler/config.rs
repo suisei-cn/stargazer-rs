@@ -18,8 +18,8 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn new(schedule_interval: Duration, max_interval: Duration) -> Self {
-        Config {
+    pub const fn new(schedule_interval: Duration, max_interval: Duration) -> Self {
+        Self {
             schedule_interval,
             max_interval,
         }
@@ -27,10 +27,10 @@ impl Config {
 }
 
 impl Config {
-    pub fn schedule_interval(&self) -> Duration {
+    pub const fn schedule_interval(&self) -> Duration {
         self.schedule_interval
     }
-    pub fn max_interval(&self) -> Duration {
+    pub const fn max_interval(&self) -> Duration {
         self.max_interval
     }
 }

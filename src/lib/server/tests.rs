@@ -57,7 +57,7 @@ mod killer {
     use std::thread;
     use std::time::Duration;
 
-    use actix::{AsyncContext, System};
+    use actix::System;
     use tokio::sync::mpsc::unbounded_channel;
     use tokio::time::{sleep, timeout};
 
@@ -78,14 +78,14 @@ mod killer {
                     actix::spawn(async move {
                         sleep(Duration::from_millis(100)).await;
                         // Killer failed to reap this system, notify main thread
-                        tx.send(());
+                        tx.send(()).unwrap();
                         System::current().stop(); // cleanup
                     });
 
                     KillerActor::start(None);
                     KillerActor::kill(true);
                 });
-                sys.run(); // join system
+                sys.run().unwrap(); // join system
             }
 
             let sys = System::new();
@@ -146,7 +146,7 @@ mod watchdog {
                     WatchdogActor::start(tx.clone()); // start watchdog
                     System::current().stop(); // trigger watchdog
                 });
-                sys.run(); // join system
+                sys.run().unwrap(); // join system
             }
 
             let sys = System::new();

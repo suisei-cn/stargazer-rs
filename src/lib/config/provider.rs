@@ -27,7 +27,7 @@ impl ConfigFile {
         }
 
         let path = path.as_ref();
-        let ext = path.extension().map(|ext| ext.to_ascii_lowercase());
+        let ext = path.extension().map(OsStr::to_ascii_lowercase);
 
         Self {
             inner: ext
@@ -37,11 +37,11 @@ impl ConfigFile {
                     _ => None,
                 })
                 .or_else(|| {
-                    if !path.is_dir() {
+                    if path.is_dir() {
+                        None
+                    } else {
                         try_parse::<Toml>(&*append_ext(path, "toml"))
                             .or_else(|| try_parse::<Json>(&*append_ext(path, "json")))
-                    } else {
-                        None
                     }
                 }),
         }
@@ -50,18 +50,15 @@ impl ConfigFile {
 
 impl Provider for ConfigFile {
     fn metadata(&self) -> Metadata {
-        if let Some(inner) = &self.inner {
-            inner.metadata()
-        } else {
-            Metadata::named("unsupported")
-        }
+        self.inner
+            .as_ref()
+            .map_or_else(|| Metadata::named("unsupported"), |inner| inner.metadata())
     }
 
     fn data(&self) -> Result<Map<Profile, Dict>, Error> {
-        if let Some(inner) = &self.inner {
-            inner.data()
-        } else {
-            Err(Error::from(String::from("unsupported format")))
-        }
+        self.inner.as_ref().map_or_else(
+            || Err(Error::from(String::from("unsupported format"))),
+            |inner| inner.data(),
+        )
     }
 }
