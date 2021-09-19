@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 pub trait TypeEq {
     type Other;
 }
@@ -66,4 +68,8 @@ macro_rules! impl_task_field_getter {
             }
         }
     };
+}
+
+pub fn timestamp(t: SystemTime) -> i64 {
+    t.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64
 }

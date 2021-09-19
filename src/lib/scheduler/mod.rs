@@ -29,14 +29,16 @@ pub trait CollectionGetter {
 }
 
 pub trait SchedulerGetter {
-    fn get_scheduler(&self) -> &Addr<ScheduleActor<Self>> where Self: Task;
+    fn get_scheduler(&self) -> &Addr<ScheduleActor<Self>>
+    where
+        Self: Task;
 }
 
 pub trait TaskFieldGetter: TaskInfoGetter + CollectionGetter + SchedulerGetter {}
 
-impl<T> TaskFieldGetter for T where T: TaskInfoGetter + CollectionGetter + SchedulerGetter{}
+impl<T> TaskFieldGetter for T where T: TaskInfoGetter + CollectionGetter + SchedulerGetter {}
 
-pub trait Task: TaskFieldGetter + Actor<Context=Context<Self>> + Debug {
+pub trait Task: TaskFieldGetter + Actor<Context = Context<Self>> + Debug {
     type Entry: Debug + Serialize + DeserializeOwned + Send + Sync;
     type Ctor;
     fn query() -> Document;

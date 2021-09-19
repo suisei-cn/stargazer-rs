@@ -96,7 +96,13 @@ where
                         // We've got an entry.
                         let uuid = info.uuid();
                         info!("entry stolen: {:?}", entry);
-                        let actor = T::construct(entry, (*ctor_builder)(), scheduler_addr, info, collection);
+                        let actor = T::construct(
+                            entry,
+                            (*ctor_builder)(),
+                            scheduler_addr,
+                            info,
+                            collection,
+                        );
                         let addr = actor.start();
                         (uuid, addr)
                     })

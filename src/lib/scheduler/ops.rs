@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
@@ -13,6 +13,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::db::{Collection, DBOperation};
+use crate::utils::timestamp;
 
 use super::models::{SchedulerMeta, TaskInfo};
 
@@ -33,11 +34,14 @@ impl DBOperation for UpdateTSOp {
 
     async fn execute(&self, collection: &Collection) -> DBResult<Self::Result> {
         Ok(collection
-            .update_one(doc! {"_id": self.task_info.doc_id(), "uuid": self.task_info.uuid().to_string()},
-                        doc! {"$set": {"timestamp": SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as i64}},
-                        None)
+            .update_one(
+                doc! {"_id": self.task_info.doc_id(), "uuid": self.task_info.uuid().to_string()},
+                doc! {"$set": {"timestamp": timestamp(SystemTime::now())}},
+                None,
+            )
             .await?
-            .modified_count > 0)
+            .modified_count
+            > 0)
     }
 }
 
@@ -196,14 +200,8 @@ impl<T> ScheduleOp<T> {
         parent_meta: SchedulerMeta,
         ago: Duration,
     ) -> Self {
-        let since_ts = (SystemTime::now() - ago)
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
-        let now_ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
+        let since_ts = timestamp(SystemTime::now() - ago);
+        let now_ts = timestamp(SystemTime::now());
         let uuid = Uuid::new_v4();
         let update = doc! {
             "$set": {
