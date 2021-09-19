@@ -1,12 +1,13 @@
 use std::fmt::Debug;
 
-use actix::{Actor, Addr, Context};
+use actix::{Actor, Context};
 use serde::{de::DeserializeOwned, Serialize};
 
-use actor::ScheduleActor;
-use models::TaskInfo;
+pub use actor::ScheduleActor;
+pub use models::TaskInfo;
 
 use crate::db::{Collection, Document};
+use crate::utils::Scheduler;
 
 pub mod actor;
 mod config;
@@ -17,7 +18,7 @@ mod ops;
 mod tests;
 
 pub trait SchedulerGetter {
-    fn get_scheduler(&self) -> &Addr<ScheduleActor<Self>>
+    fn get_scheduler(&self) -> &Scheduler<Self>
     where
         Self: Task;
 }
@@ -33,7 +34,7 @@ pub trait Task: TaskFieldGetter + Actor<Context = Context<Self>> + Debug {
     fn construct(
         entry: Self::Entry,
         ctor: Self::Ctor,
-        scheduler: Addr<ScheduleActor<Self>>,
+        scheduler: Scheduler<Self>,
         info: TaskInfo,
         collection: Collection,
     ) -> Self;

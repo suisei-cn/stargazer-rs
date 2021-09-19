@@ -1,5 +1,11 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use actix::Addr;
+
+use crate::scheduler::actor::ScheduleActor;
+
+pub type Scheduler<T> = Addr<ScheduleActor<T>>;
+
 pub trait TypeEq {
     type Other;
 }
@@ -36,7 +42,7 @@ macro_rules! impl_stop_on_panic {
         impl Drop for $name {
             fn drop(&mut self) {
                 if std::thread::panicking() {
-                    KillerActor::kill(true)
+                    crate::KillerActor::kill(true)
                 }
             }
         }

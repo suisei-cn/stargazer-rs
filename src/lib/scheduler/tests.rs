@@ -1,10 +1,10 @@
 use std::mem::MaybeUninit;
 
-use actix::{Actor, Addr, Context};
+use actix::{Actor, Context};
 
 use crate::db::{Collection, Document};
-use crate::scheduler::actor::ScheduleActor;
 use crate::scheduler::{Task, TaskFieldGetter};
+use crate::utils::Scheduler;
 
 use super::models::TaskInfo;
 
@@ -12,7 +12,7 @@ use super::models::TaskInfo;
 struct DummyTask {
     info: TaskInfo,
     collection: Collection,
-    scheduler: Addr<ScheduleActor<DummyTask>>,
+    scheduler: Scheduler<Self>,
 }
 
 impl_task_field_getter!(DummyTask, scheduler);
@@ -32,7 +32,7 @@ impl Task for DummyTask {
     fn construct(
         _entry: Self::Entry,
         _ctor: Self::Ctor,
-        _scheduler: Addr<ScheduleActor<Self>>,
+        _scheduler: Scheduler<Self>,
         _info: TaskInfo,
         _collection: Collection,
     ) -> Self {

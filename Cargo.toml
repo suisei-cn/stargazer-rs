@@ -18,9 +18,10 @@ actix = "0.12"
 actix-web = "4.0.0-beta.9"
 anyhow = "1.0"
 async-trait = "0.1"
+bililive = { git = "https://github.com/PhotonQuantum/bililive-rs" }
 clap = "3.0.0-beta.4"
-figment = { version = "0.10", features = ["toml", "json", "env"] }
 dirs = "4.0"
+figment = { version = "0.10", features = ["toml", "json", "env"] }
 futures = "0.3"
 humantime-serde = "1.0"
 itertools = "0.10"

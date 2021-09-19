@@ -21,5 +21,6 @@ mod server;
 mod common;
 mod db;
 mod scheduler;
+mod source;
 #[cfg(test)]
 mod tests;
