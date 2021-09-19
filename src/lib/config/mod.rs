@@ -1,7 +1,8 @@
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::path::Path;
+use std::time::Duration;
 
-use figment::providers::Env;
+use figment::providers::{Env, Serialized};
 use figment::{Error, Figment};
 use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -12,10 +13,42 @@ mod provider;
 #[cfg(test)]
 mod tests;
 
+pub type ScheduleConfig = Schedule;
+pub type ScheduleHTTP = HTTP;
+
 /// Contains all configuration to run the application.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
 pub struct Config {
     http: HTTP,
+    schedule: Schedule,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
+pub struct Schedule {
+    /// Interval between schedule attempts.
+    #[serde(with = "humantime_serde")]
+    schedule_interval: Duration,
+    /// Max allowed duration for an entry to be an orphan.
+    #[serde(with = "humantime_serde")]
+    max_interval: Duration,
+}
+
+impl Schedule {
+    pub const fn schedule_interval(&self) -> Duration {
+        self.schedule_interval
+    }
+    pub const fn max_interval(&self) -> Duration {
+        self.max_interval
+    }
+}
+
+impl Default for Schedule {
+    fn default() -> Self {
+        Self {
+            schedule_interval: Duration::from_secs(3),
+            max_interval: Duration::from_secs(10),
+        }
+    }
 }
 
 // TODO workaround before https://github.com/serde-rs/serde/pull/2056 is merged
@@ -26,6 +59,15 @@ pub enum HTTP {
     Disabled,
     // #[serde(rename = true)]
     Enabled { host: IpAddr, port: u16 },
+}
+
+impl Default for HTTP {
+    fn default() -> Self {
+        Self::Enabled {
+            host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            port: 8080,
+        }
+    }
 }
 
 impl Config {
@@ -46,7 +88,7 @@ impl Config {
         let config = config
             .map_or_else(
                 || {
-                    Figment::new()
+                    Figment::from(Serialized::defaults(Self::default()))
                         .merge(ConfigFile::file("/etc/stargazer/config"))
                         .merge(ConfigFile::file(
                             dirs::config_dir()
@@ -55,7 +97,10 @@ impl Config {
                         ))
                         .merge(ConfigFile::file("config"))
                 },
-                |config| Figment::new().merge(ConfigFile::file(config)),
+                |config| {
+                    Figment::from(Serialized::defaults(Self::default()))
+                        .merge(ConfigFile::file(config))
+                },
             )
             .merge(Env::prefixed("STARGAZER_").split("_"));
 

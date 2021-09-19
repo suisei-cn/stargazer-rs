@@ -22,6 +22,7 @@ clap = "3.0.0-beta.4"
 figment = { version = "0.10", features = ["toml", "json", "env"] }
 dirs = "4.0"
 futures = "0.3"
+humantime-serde = "1.0"
 itertools = "0.10"
 log = "0.4"
 mongodb = "2.0.0"

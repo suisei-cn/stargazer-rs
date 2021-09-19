@@ -2,3 +2,7 @@
 enabled = true
 host = "127.0.0.1"
 port = 8000
+
+[schedule]
+schedule_interval = "10s"
+max_interval = "1m"
