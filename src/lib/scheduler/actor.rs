@@ -13,6 +13,8 @@ use uuid::Uuid;
 
 use crate::common::ResponseWrapper;
 use crate::db::{Collection, DBOperation, DBResult};
+use crate::scheduler::messages::UpdateTimestamp;
+use crate::scheduler::ops::UpdateTSOp;
 
 use super::config::Config;
 use super::messages::{ActorsIter, GetId, TriggerGC, TrySchedule};
@@ -118,6 +120,19 @@ where
                 })
             }),
         )
+    }
+}
+
+impl<T> Handler<UpdateTimestamp> for ScheduleActor<T>
+where
+    T: 'static + Task + Actor<Context = Context<T>> + Unpin,
+{
+    type Result = ResponseFuture<DBResult<bool>>;
+
+    fn handle(&mut self, msg: UpdateTimestamp, _ctx: &mut Self::Context) -> Self::Result {
+        let collection = self.collection.clone();
+        let op = UpdateTSOp::new(msg.0);
+        Box::pin(async move { op.execute(&collection).await })
     }
 }
 

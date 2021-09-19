@@ -44,24 +44,9 @@ macro_rules! impl_stop_on_panic {
 }
 
 #[macro_export]
-/// impl_task_field_getter!(Actor, info, collection, scheduler)
+/// impl_task_field_getter!(Actor, scheduler)
 macro_rules! impl_task_field_getter {
-    ($self: ident, $info: ident, $collection: ident, $scheduler: ident) => {
-        impl $crate::scheduler::TaskInfoGetter for $self {
-            fn get_info(&self) -> TaskInfo {
-                self.$info
-            }
-            fn get_info_mut(&mut self) -> &mut $crate::scheduler::models::TaskInfo {
-                &mut self.$info
-            }
-        }
-
-        impl $crate::scheduler::CollectionGetter for $self {
-            fn get_collection(&self) -> &$crate::db::Collection {
-                &self.$collection
-            }
-        }
-
+    ($self: ident, $scheduler: ident) => {
         impl $crate::scheduler::SchedulerGetter for $self {
             fn get_scheduler(&self) -> &actix::Addr<$crate::scheduler::actor::ScheduleActor<Self>> {
                 &self.$scheduler

@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-use crate::db::DBResult;
 use actix::{Actor, Addr, Message, ResponseFuture};
 use uuid::Uuid;
+
+use crate::db::DBResult;
+use crate::scheduler::models::TaskInfo;
 
 #[derive(Debug, Copy, Clone)]
 pub struct TrySchedule<T>(PhantomData<T>);
@@ -11,6 +13,12 @@ pub struct TrySchedule<T>(PhantomData<T>);
 impl<T: Actor> Message for TrySchedule<T> {
     type Result = DBResult<Option<(Uuid, Addr<T>)>>;
 }
+
+/// Update the timestamp.
+/// Returns `false` if the resource bound to this worker is replaced by another worker or deleted
+#[derive(Debug, Copy, Clone, Message)]
+#[rtype("DBResult<bool>")]
+pub struct UpdateTimestamp(pub TaskInfo);
 
 #[derive(Debug, Copy, Clone, Message)]
 #[rtype("uuid::Uuid")]
@@ -29,6 +37,15 @@ where
     inner: F,
     __marker_1: PhantomData<A>,
     __marker_2: PhantomData<Output>,
+}
+
+impl<A, F, Output> Message for ActorsIter<A, F, Output>
+where
+    A: Actor,
+    F: FnOnce(HashMap<Uuid, Addr<A>>) -> ResponseFuture<Output>,
+    Output: 'static,
+{
+    type Result = Output;
 }
 
 impl<T> Default for TrySchedule<T> {
@@ -58,13 +75,4 @@ where
     pub fn into_inner(self) -> F {
         self.inner
     }
-}
-
-impl<A, F, Output> Message for ActorsIter<A, F, Output>
-where
-    A: Actor,
-    F: FnOnce(HashMap<Uuid, Addr<A>>) -> ResponseFuture<Output>,
-    Output: 'static,
-{
-    type Result = Output;
 }

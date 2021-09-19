@@ -15,7 +15,7 @@ struct DummyTask {
     scheduler: Addr<ScheduleActor<DummyTask>>,
 }
 
-impl_task_field_getter!(DummyTask, info, collection, scheduler);
+impl_task_field_getter!(DummyTask, scheduler);
 
 impl Actor for DummyTask {
     type Context = Context<Self>;
