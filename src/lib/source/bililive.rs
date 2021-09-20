@@ -28,7 +28,7 @@ impl BililiveEntry {
 pub struct BililiveActor {
     uid: u64,
     schedule_config: ScheduleConfig,
-    collection: Collection,
+    collection: Collection<Document>,
     info: TaskInfo,
     scheduler: Scheduler<Self>,
 }
@@ -127,7 +127,7 @@ impl Task for BililiveActor {
         ctor: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
-        collection: Collection,
+        collection: Collection<Document>,
     ) -> Self {
         Self {
             uid: entry.uid(),

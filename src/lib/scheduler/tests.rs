@@ -11,7 +11,7 @@ use super::models::TaskInfo;
 #[derive(Debug, Clone)]
 struct DummyTask {
     info: TaskInfo,
-    collection: Collection,
+    collection: Collection<Document>,
     scheduler: Scheduler<Self>,
 }
 
@@ -34,7 +34,7 @@ impl Task for DummyTask {
         _ctor: Self::Ctor,
         _scheduler: Scheduler<Self>,
         _info: TaskInfo,
-        _collection: Collection,
+        _collection: Collection<Document>,
     ) -> Self {
         unreachable!()
     }

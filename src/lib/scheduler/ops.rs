@@ -31,8 +31,9 @@ impl UpdateTSOp {
 #[async_trait]
 impl DBOperation for UpdateTSOp {
     type Result = bool;
+    type Item = Document;
 
-    async fn execute(&self, collection: &Collection) -> DBResult<Self::Result> {
+    async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         Ok(collection
             .update_one(
                 doc! {"_id": self.task_info.doc_id(), "uuid": self.task_info.uuid().to_string()},
@@ -56,9 +57,9 @@ pub enum ScheduleMode {
 }
 
 // internal enum for schedule op
-enum ScheduleResult {
+enum ScheduleResult<T> {
     // We've acquired the task.
-    Some(Document),
+    Some(T),
     // No task acquired.
     None,
     // Conflict with another scheduler.
@@ -92,8 +93,9 @@ impl GetAllTasksCount {
 #[async_trait]
 impl DBOperation for GetAllTasksCount {
     type Result = u64;
+    type Item = Document;
 
-    async fn execute(&self, collection: &Collection) -> DBResult<Self::Result> {
+    async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         collection
             .count_documents(self.base_query.clone(), None)
             .await
@@ -110,8 +112,9 @@ pub struct GetWorkerInfoOp {
 #[async_trait]
 impl DBOperation for GetWorkerInfoOp {
     type Result = Vec<WorkerInfo>;
+    type Item = WorkerInfo;
 
-    async fn execute(&self, collection: &Collection) -> DBResult<Self::Result> {
+    async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let filter_query = doc! {
             "$match": {
                 "$and": [
@@ -165,8 +168,9 @@ impl GetTasksOnWorkerOp {
 #[async_trait]
 impl DBOperation for GetTasksOnWorkerOp {
     type Result = Vec<TaskInfo>;
+    type Item = TaskInfo;
 
-    async fn execute(&self, collection: &Collection) -> DBResult<Self::Result> {
+    async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let filter_query = doc! {
             "$and": [
                 {"parent_uuid": self.worker.to_string()},   // select worker
@@ -177,7 +181,6 @@ impl DBOperation for GetTasksOnWorkerOp {
         collection
             .find(filter_query, None)
             .await?
-            .map(|doc| doc.map(|doc| -> TaskInfo { bson::from_document(doc).unwrap() }))
             .try_collect()
             .await
     }
@@ -221,7 +224,7 @@ impl<T> ScheduleOp<T> {
     }
 
     // Try to acquire an outdated entry.
-    async fn do_acquire(&self, collection: &Collection) -> DBResult<Option<Document>> {
+    async fn do_acquire(&self, collection: &Collection<Document>) -> DBResult<Option<Document>> {
         let mut query = self.query.clone();
         query.insert(
             "$or",
@@ -251,7 +254,10 @@ impl<T> ScheduleOp<T> {
             .await
     }
 
-    async fn do_schedule_once(&self, collection: &Collection) -> DBResult<ScheduleResult> {
+    async fn do_schedule_once(
+        &self,
+        collection: &Collection<Document>,
+    ) -> DBResult<ScheduleResult<Document>> {
         let entries_count = GetAllTasksCount::new(self.query.clone())
             .execute(collection)
             .await?;
@@ -314,8 +320,9 @@ impl<T> ScheduleOp<T> {
 #[async_trait]
 impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
     type Result = Option<(TaskInfo, T)>;
+    type Item = Document;
 
-    async fn execute(&self, collection: &Collection) -> DBResult<Self::Result> {
+    async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         Ok(match self.mode {
             ScheduleMode::Auto => {
                 if let Some(res) = self.do_acquire(collection).await? {

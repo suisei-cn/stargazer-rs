@@ -9,12 +9,13 @@ use actix::{
     WrapFuture,
 };
 use tracing::{info, info_span};
+use tracing_actix::ActorInstrument;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::common::ResponseWrapper;
 use crate::config::ScheduleConfig;
-use crate::db::{Collection, DBOperation, DBResult};
+use crate::db::{Collection, DBOperation, DBResult, Document};
 use crate::scheduler::messages::UpdateTimestamp;
 use crate::scheduler::ops::UpdateTSOp;
 
@@ -22,7 +23,6 @@ use super::messages::{ActorsIter, GetId, TriggerGC, TrySchedule};
 use super::models::SchedulerMeta;
 use super::ops::{ScheduleMode, ScheduleOp};
 use super::Task;
-use tracing_actix::ActorInstrument;
 
 #[derive(Debug, Clone)]
 pub struct ScheduleContext<T: Actor> {
@@ -56,7 +56,7 @@ pub struct ScheduleActor<T>
 where
     T: Task,
 {
-    pub(crate) collection: Collection,
+    pub(crate) collection: Collection<Document>,
     #[builder(setter(transform = | f: impl Fn() -> T::Ctor + Send + Sync + 'static | Arc::new(f) as Arc < dyn Fn() -> T::Ctor + Send + Sync >))]
     pub(crate) ctor_builder: Arc<dyn Fn() -> T::Ctor + Send + Sync>,
     pub(crate) config: ScheduleConfig,

@@ -35,6 +35,6 @@ pub trait Task: TaskFieldGetter + Actor<Context = Context<Self>> + Debug {
         ctor: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
-        collection: Collection,
+        collection: Collection<Document>,
     ) -> Self;
 }
