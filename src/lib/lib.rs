@@ -20,7 +20,7 @@ mod server;
 
 mod common;
 mod db;
-mod scheduler;
+pub mod scheduler;
 mod source;
 #[cfg(test)]
 mod tests;

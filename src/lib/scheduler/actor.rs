@@ -9,6 +9,7 @@ use actix::{
     WrapFuture,
 };
 use log::info;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::common::ResponseWrapper;
@@ -49,14 +50,16 @@ impl<T: Actor> Default for ScheduleContext<T> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, TypedBuilder)]
 pub struct ScheduleActor<T>
 where
     T: Task,
 {
     pub(crate) collection: Collection,
+    #[builder(setter(transform = | f: impl Fn() -> T::Ctor + 'static | Arc::new(f) as Arc < dyn Fn() -> T::Ctor >))]
     pub(crate) ctor_builder: Arc<dyn Fn() -> T::Ctor>,
     pub(crate) config: Config,
+    #[builder(default, setter(skip))]
     pub(crate) ctx: ScheduleContext<T>,
 }
 

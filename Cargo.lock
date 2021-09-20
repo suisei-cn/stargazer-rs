@@ -2146,6 +2146,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+ "typed-builder",
  "uuid",
 ]
 
