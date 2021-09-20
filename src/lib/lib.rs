@@ -18,6 +18,7 @@ mod error;
 pub mod request;
 mod server;
 
+pub mod collector;
 mod common;
 pub mod db;
 pub mod scheduler;

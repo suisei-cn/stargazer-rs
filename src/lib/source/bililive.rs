@@ -93,7 +93,7 @@ impl Actor for BililiveActor {
 
         // update timestamp
         ctx.run_interval(self.schedule_config.max_interval() / 2, |_, ctx| {
-            ctx.notify(TickOrStop)
+            ctx.notify(TickOrStop);
         });
 
         let uid = self.uid;
