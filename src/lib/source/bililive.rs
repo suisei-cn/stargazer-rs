@@ -93,6 +93,12 @@ impl Actor for BililiveActor {
                         if let Ok(mut stream) = stream {
                             // poll packet
                             while let Some(msg) = stream.next().await {
+                                let res = act.scheduler.send(UpdateTimestamp(act.info)).await;
+                                if !res.unwrap_or(Ok(false)).unwrap_or(false) {
+                                    warn!("unable to renew ts, trying to stop");
+                                    break;
+                                }
+
                                 match msg {
                                     Ok(msg) => {
                                         // TODO output
