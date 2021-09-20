@@ -337,7 +337,6 @@ impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
             },
         }
         .map(|res| {
-            info!("{:?}", res);
             (
                 bson::from_document(res.clone()).unwrap(),
                 bson::from_document(res).unwrap(),

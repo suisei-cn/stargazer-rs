@@ -43,7 +43,9 @@ impl Actor for BililiveActor {
     fn started(&mut self, ctx: &mut Self::Context) {
         let task_id = self.info.uuid();
         let uid = self.uid;
-        info!("BililiveActor {} started, handling {}", task_id, uid);
+        info_span!("bililive", ?task_id, uid).in_scope(|| {
+            info!("started");
+        });
 
         // update timestamp
         ctx.run_interval(self.schedule_config.max_interval() / 2, move |act, ctx| {

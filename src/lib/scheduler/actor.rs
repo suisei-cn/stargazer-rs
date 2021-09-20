@@ -8,7 +8,7 @@ use actix::{
     Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, ResponseActFuture, ResponseFuture,
     WrapFuture,
 };
-use tracing::info;
+use tracing::{info, info_span};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -22,6 +22,7 @@ use super::messages::{ActorsIter, GetId, TriggerGC, TrySchedule};
 use super::models::SchedulerMeta;
 use super::ops::{ScheduleMode, ScheduleOp};
 use super::Task;
+use tracing_actix::ActorInstrument;
 
 #[derive(Debug, Clone)]
 pub struct ScheduleContext<T: Actor> {
@@ -84,8 +85,12 @@ where
         let collection = self.collection.clone();
         let config = self.config;
         let ctor_builder = self.ctor_builder.clone();
+
         let ctx_meta = SchedulerMeta::from(&self.ctx);
         let scheduler_addr = ctx.address();
+
+        let scheduler_id = self.ctx.id;
+
         Box::pin(
             async move {
                 ScheduleOp::new(
@@ -121,7 +126,8 @@ where
                         (uuid, addr)
                     })
                 })
-            }),
+            })
+            .actor_instrument(info_span!("scheduler", id=?scheduler_id)),
         )
     }
 }
@@ -157,6 +163,7 @@ where
     type Result = ();
 
     fn handle(&mut self, _msg: TriggerGC, _ctx: &mut Self::Context) -> Self::Result {
+        let _span = info_span!("scheduler", id=?self.ctx.id).entered();
         self.ctx
             .actors
             .iter()
