@@ -1,12 +1,14 @@
 use std::fmt::Debug;
 
-use actix::{Actor, Context};
+use actix::{Actor, ActorFutureExt, Context, Message, ResponseActFuture, WrapFuture};
 use serde::{de::DeserializeOwned, Serialize};
+use tracing::Span;
 
 pub use actor::ScheduleActor;
 pub use models::TaskInfo;
 
 use crate::db::{Collection, Document};
+use crate::scheduler::messages::UpdateTimestamp;
 use crate::utils::Scheduler;
 
 pub mod actor;
@@ -22,9 +24,21 @@ pub trait SchedulerGetter {
         Self: Task;
 }
 
-pub trait TaskFieldGetter: SchedulerGetter {}
+pub trait InfoGetter {
+    fn get_info(&self) -> TaskInfo;
+}
 
-impl<T> TaskFieldGetter for T where T: SchedulerGetter {}
+pub trait TaskFieldGetter: SchedulerGetter + InfoGetter {}
+
+impl<T> TaskFieldGetter for T where T: SchedulerGetter + InfoGetter {}
+
+#[derive(Debug, Copy, Clone, Message)]
+#[rtype("bool")]
+pub struct Tick;
+
+#[derive(Debug, Copy, Clone, Message)]
+#[rtype("()")]
+pub struct TickOrStop;
 
 pub trait Task: TaskFieldGetter + Actor<Context = Context<Self>> + Debug {
     type Entry: Debug + Serialize + DeserializeOwned + Send + Sync;
@@ -37,4 +51,14 @@ pub trait Task: TaskFieldGetter + Actor<Context = Context<Self>> + Debug {
         info: TaskInfo,
         collection: Collection<Document>,
     ) -> Self;
+    fn span(&self) -> Span;
+}
+
+pub(crate) fn handle_tick<S: Task>(this: &S) -> ResponseActFuture<S, bool> {
+    Box::pin(
+        this.get_scheduler()
+            .send(UpdateTimestamp(this.get_info()))
+            .into_actor(this)
+            .map(|res, _, _| res.unwrap_or(Ok(false)).unwrap_or(false)),
+    )
 }

@@ -1,6 +1,7 @@
 use std::mem::MaybeUninit;
 
 use actix::{Actor, Context};
+use tracing::{info_span, Span};
 
 use crate::db::{Collection, Document};
 use crate::scheduler::{Task, TaskFieldGetter};
@@ -15,7 +16,7 @@ struct DummyTask {
     scheduler: Scheduler<Self>,
 }
 
-impl_task_field_getter!(DummyTask, scheduler);
+impl_task_field_getter!(DummyTask, info, scheduler);
 
 impl Actor for DummyTask {
     type Context = Context<Self>;
@@ -37,6 +38,10 @@ impl Task for DummyTask {
         _collection: Collection<Document>,
     ) -> Self {
         unreachable!()
+    }
+
+    fn span(&self) -> Span {
+        info_span!("dummy")
     }
 }
 

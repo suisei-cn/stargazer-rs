@@ -8,7 +8,7 @@ use actix::{
     Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, ResponseActFuture, ResponseFuture,
     WrapFuture,
 };
-use tracing::{info, info_span};
+use tracing::{info, info_span, warn};
 use tracing_actix::ActorInstrument;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -171,7 +171,7 @@ where
             .collect::<Vec<_>>()
             .into_iter()
             .for_each(|uuid| {
-                info!("Removing {} from actors", uuid);
+                warn!("Removing {} from actors", uuid);
                 self.ctx.actors.remove(&uuid);
             });
     }

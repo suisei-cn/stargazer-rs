@@ -1,15 +1,18 @@
+use std::fmt::Debug;
+
 use actix::fut::ready;
-use actix::{Actor, ActorContext, ActorFutureExt, AsyncContext, Context, WrapFuture};
+use actix::{
+    Actor, ActorContext, ActorFutureExt, AsyncContext, Context, Handler, Message,
+    ResponseActFuture, StreamHandler, WrapFuture,
+};
 use bililive::tokio::connect_with_retry;
-use bililive::{ConfigBuilder, RetryConfig};
-use futures::StreamExt;
+use bililive::{BililiveError, ConfigBuilder, Packet, RetryConfig};
 use serde::{Deserialize, Serialize};
-use tracing::{info, info_span, warn};
+use tracing::{info, info_span, warn, Span};
 use tracing_actix::ActorInstrument;
 
 use crate::db::{Collection, Document};
-use crate::scheduler::messages::UpdateTimestamp;
-use crate::scheduler::{Task, TaskInfo};
+use crate::scheduler::{Task, TaskInfo, Tick, TickOrStop};
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
 
@@ -33,37 +36,67 @@ pub struct BililiveActor {
     scheduler: Scheduler<Self>,
 }
 
-impl_task_field_getter!(BililiveActor, scheduler);
+impl_task_field_getter!(BililiveActor, info, scheduler);
 impl_stop_on_panic!(BililiveActor);
 impl_message_target!(pub BililiveTarget, BililiveActor);
+impl_tick_handler!(BililiveActor);
+
+#[derive(Debug, Clone, Message)]
+#[rtype("()")]
+struct ToCollector<T: Debug>(T);
+
+impl<T: 'static + Debug> Handler<ToCollector<T>> for BililiveActor {
+    type Result = ResponseActFuture<Self, ()>;
+
+    fn handle(&mut self, msg: ToCollector<T>, ctx: &mut Self::Context) -> Self::Result {
+        Box::pin(
+            ctx.address()
+                .send(Tick)
+                .into_actor(self)
+                .map(move |res, _act, ctx| {
+                    let holding_ownership = res.unwrap_or(false);
+                    if holding_ownership {
+                        // TODO send to collector
+                        info!("{:?}", msg.0);
+                    } else {
+                        warn!("unable to renew ts, trying to stop");
+                        ctx.stop();
+                    };
+                })
+                .actor_instrument(self.span()),
+        )
+    }
+}
+
+impl StreamHandler<Result<Packet, BililiveError>> for BililiveActor {
+    fn handle(&mut self, item: Result<Packet, BililiveError>, ctx: &mut Self::Context) {
+        let _span = self.span().entered();
+        match item {
+            Ok(msg) => {
+                ctx.notify(ToCollector(msg));
+            }
+            Err(e) => {
+                warn!("stream error: {}", e);
+                ctx.stop();
+            }
+        }
+    }
+}
 
 impl Actor for BililiveActor {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        let task_id = self.info.uuid();
-        let uid = self.uid;
-        info_span!("bililive", ?task_id, uid).in_scope(|| {
+        self.span().in_scope(|| {
             info!("started");
         });
 
         // update timestamp
-        ctx.run_interval(self.schedule_config.max_interval() / 2, move |act, ctx| {
-            ctx.spawn(
-                act.scheduler
-                    .send(UpdateTimestamp(act.info))
-                    .into_actor(act)
-                    .map(|res, _act, ctx| {
-                        if !res.unwrap_or(Ok(false)).unwrap_or(false) {
-                            warn!("unable to renew ts, trying to stop");
-                            // op failed
-                            ctx.stop();
-                        }
-                    })
-                    .actor_instrument(info_span!("bililive", ?task_id, uid)),
-            );
+        ctx.run_interval(self.schedule_config.max_interval() / 2, |_, ctx| {
+            ctx.notify(TickOrStop)
         });
 
+        let uid = self.uid;
         ctx.spawn(
             ready(())
                 .into_actor(self)
@@ -82,40 +115,14 @@ impl Actor for BililiveActor {
                     }
                     .into_actor(act)
                 })
-                .map(|stream, _act, _| {
-                    if let Err(ref e) = stream {
-                        warn!("failed to connect stream: {}", e);
+                .map(|stream, _, ctx| match stream {
+                    Ok(stream) => {
+                        info!("stream added");
+                        Self::add_stream(stream, ctx);
                     }
-                    stream
+                    Err(e) => warn!("failed to connect stream: {}", e),
                 })
-                .then(move |stream, act, _| {
-                    async move {
-                        if let Ok(mut stream) = stream {
-                            // poll packet
-                            while let Some(msg) = stream.next().await {
-                                let res = act.scheduler.send(UpdateTimestamp(act.info)).await;
-                                if !res.unwrap_or(Ok(false)).unwrap_or(false) {
-                                    warn!("unable to renew ts, trying to stop");
-                                    break;
-                                }
-
-                                match msg {
-                                    Ok(msg) => {
-                                        // TODO output
-                                        info!("{:?}", msg);
-                                    }
-                                    Err(e) => {
-                                        warn!("stream error: {}", e);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .into_actor(act)
-                })
-                .map(|_, _, ctx| ctx.stop())
-                .actor_instrument(info_span!("bililive", ?task_id, uid)),
+                .actor_instrument(self.span()),
         );
     }
 }
@@ -142,5 +149,11 @@ impl Task for BililiveActor {
             info,
             scheduler,
         }
+    }
+
+    fn span(&self) -> Span {
+        let task_id = self.info.uuid();
+        let uid = self.uid;
+        info_span!("bililive", ?task_id, uid)
     }
 }
