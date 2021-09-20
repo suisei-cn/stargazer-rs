@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 pub use mongodb::bson::Document;
 pub use mongodb::error::Result as DBResult;
+use mongodb::{Client, Database};
 
 pub type Collection = mongodb::Collection<mongodb::bson::Document>;
 
@@ -8,4 +9,11 @@ pub type Collection = mongodb::Collection<mongodb::bson::Document>;
 pub trait DBOperation {
     type Result;
     async fn execute(&self, collection: &Collection) -> DBResult<Self::Result>;
+}
+
+pub async fn connect_db(db_uri: &str, db_name: &str) -> Database {
+    Client::with_uri_str(db_uri)
+        .await
+        .unwrap()
+        .database(db_name)
 }

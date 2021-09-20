@@ -6,3 +6,7 @@ port = 8000
 [schedule]
 schedule_interval = "10s"
 max_interval = "1m"
+
+[mongodb]
+uri = "mongodb://localhost"
+database = "stargazer"

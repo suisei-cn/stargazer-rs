@@ -13,11 +13,11 @@ use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::common::ResponseWrapper;
+use crate::config::ScheduleConfig;
 use crate::db::{Collection, DBOperation, DBResult};
 use crate::scheduler::messages::UpdateTimestamp;
 use crate::scheduler::ops::UpdateTSOp;
 
-use super::config::Config;
 use super::messages::{ActorsIter, GetId, TriggerGC, TrySchedule};
 use super::models::SchedulerMeta;
 use super::ops::{ScheduleMode, ScheduleOp};
@@ -56,9 +56,9 @@ where
     T: Task,
 {
     pub(crate) collection: Collection,
-    #[builder(setter(transform = | f: impl Fn() -> T::Ctor + 'static | Arc::new(f) as Arc < dyn Fn() -> T::Ctor >))]
-    pub(crate) ctor_builder: Arc<dyn Fn() -> T::Ctor>,
-    pub(crate) config: Config,
+    #[builder(setter(transform = | f: impl Fn() -> T::Ctor + Send + Sync + 'static | Arc::new(f) as Arc < dyn Fn() -> T::Ctor + Send + Sync >))]
+    pub(crate) ctor_builder: Arc<dyn Fn() -> T::Ctor + Send + Sync>,
+    pub(crate) config: ScheduleConfig,
     #[builder(default, setter(skip))]
     pub(crate) ctx: ScheduleContext<T>,
 }

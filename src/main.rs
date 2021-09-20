@@ -1,17 +1,12 @@
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
 
-use actix::{Actor, AsyncContext, Context, Handler, Message};
-use actix_web::Responder;
+use actix::Actor;
 use clap::{AppSettings, Clap};
-use uuid::Uuid;
 
-use stargazer_lib::{
-    impl_message_target, impl_stop_on_panic, ArbiterContext, Config, KillerActor, Server,
-    ServerMode,
-};
+use stargazer_lib::db::{connect_db, Collection};
+use stargazer_lib::scheduler::ScheduleActor;
+use stargazer_lib::source::bililive::BililiveActor;
+use stargazer_lib::{ArbiterContext, Config, ScheduleConfig, Server, ServerMode};
 
 #[derive(Clap)]
 #[clap(
@@ -25,73 +20,29 @@ struct Opts {
     config: Option<PathBuf>,
 }
 
-struct PanicActor {
-    instance_id: Uuid,
-    arbiter_id: Uuid,
-    timed_panic: bool,
-}
-
-impl_message_target!(PanicTarget, PanicActor);
-
-impl Actor for PanicActor {
-    type Context = Context<Self>;
-    fn started(&mut self, ctx: &mut Self::Context) {
-        if self.timed_panic {
-            ctx.run_later(Duration::from_secs(5), |_act, _ctx| {
-                panic!("boom");
-            });
-        }
-    }
-}
-
-#[derive(Message)]
-#[rtype("()")]
-struct PanicSignal;
-
-impl Handler<PanicSignal> for PanicActor {
-    type Result = ();
-
-    fn handle(&mut self, _msg: PanicSignal, _ctx: &mut Self::Context) -> Self::Result {
-        println!("inst {} arb {}", self.instance_id, self.arbiter_id);
-        panic!("inst {} arb {}", self.instance_id, self.arbiter_id);
-    }
-}
-
-impl_stop_on_panic!(PanicActor);
-
-#[actix_web::get("/panic")]
-async fn panic_serv(ctx: actix_web::web::Data<ArbiterContext>) -> impl Responder {
-    let _ = ctx.send(PanicTarget, PanicSignal).unwrap().await;
-    "ok"
-}
-
 #[actix_web::main]
 async fn main() {
     pretty_env_logger::init();
     let opts = Opts::parse();
-    let config = Config::new(opts.config.as_deref());
-    let lock_once = Arc::new(AtomicBool::new(false));
+    let config = Config::new(opts.config.as_deref()).unwrap();
+
+    let db = connect_db(config.mongodb().uri(), config.mongodb().database()).await;
+    let coll: Collection = db.collection("bililive");
     Server::new(move |instance_id| {
         let ctx = ArbiterContext::new(instance_id);
 
-        let panic_act = PanicActor {
-            instance_id,
-            arbiter_id: ctx.arbiter_id(),
-            timed_panic: !lock_once.fetch_or(true, Ordering::SeqCst),
-        };
-        let panic_addr = panic_act.start();
+        let bililive_actor: ScheduleActor<BililiveActor> = ScheduleActor::builder()
+            .collection(coll.clone())
+            .ctor_builder(ScheduleConfig::default)
+            .config(ScheduleConfig::default())
+            .build();
+        let bililive_addr = bililive_actor.start();
 
         // register actor addrs
-        (ctx.register_addr(panic_addr), |config| {
-            config.service(panic_serv);
-        })
+        (ctx.register_addr(bililive_addr), |_| {})
     })
-    // .run(ServerMode::HTTP {
-    //     port: "127.0.0.1:8080".parse().unwrap(),
-    // })
-    .run(ServerMode::NoHTTP)
+    .run(config.http().into())
     .unwrap()
     .await
     .unwrap();
-    println!("{:?}", config);
 }

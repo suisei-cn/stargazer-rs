@@ -14,13 +14,27 @@ mod provider;
 mod tests;
 
 pub type ScheduleConfig = Schedule;
-pub type ScheduleHTTP = HTTP;
+pub type HTTPConfig = HTTP;
+pub type MongoDBConfig = MongoDB;
 
 /// Contains all configuration to run the application.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
 pub struct Config {
     http: HTTP,
     schedule: Schedule,
+    mongodb: MongoDB,
+}
+
+impl Config {
+    pub fn http(&self) -> HTTP {
+        self.http
+    }
+    pub fn schedule(&self) -> Schedule {
+        self.schedule
+    }
+    pub fn mongodb(&self) -> &MongoDB {
+        &self.mongodb
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
@@ -66,6 +80,30 @@ impl Default for HTTP {
         Self::Enabled {
             host: IpAddr::V4(Ipv4Addr::LOCALHOST),
             port: 8080,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
+pub struct MongoDB {
+    uri: String,
+    database: String,
+}
+
+impl MongoDB {
+    pub fn uri(&self) -> &str {
+        &self.uri
+    }
+    pub fn database(&self) -> &str {
+        &self.database
+    }
+}
+
+impl Default for MongoDB {
+    fn default() -> Self {
+        Self {
+            uri: String::from("mongodb://localhost"),
+            database: String::from("stargazer"),
         }
     }
 }

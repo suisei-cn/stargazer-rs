@@ -19,8 +19,8 @@ pub mod request;
 mod server;
 
 mod common;
-mod db;
+pub mod db;
 pub mod scheduler;
-mod source;
+pub mod source;
 #[cfg(test)]
 mod tests;

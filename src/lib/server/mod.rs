@@ -20,6 +20,7 @@ pub use killer::KillerActor;
 
 use crate::context::{ArbiterContext, InstanceContext};
 use crate::server::watchdog::WatchdogActor;
+use crate::HTTPConfig;
 
 mod handler;
 mod killer;
@@ -56,6 +57,17 @@ impl Future for ServerHandler {
 pub enum ServerMode {
     NoHTTP,
     HTTP { port: SocketAddr },
+}
+
+impl From<HTTPConfig> for ServerMode {
+    fn from(config: HTTPConfig) -> Self {
+        match config {
+            HTTPConfig::Disabled => Self::NoHTTP,
+            HTTPConfig::Enabled { host, port } => Self::HTTP {
+                port: SocketAddr::from((host, port)),
+            },
+        }
+    }
 }
 
 pub struct Server<F, SF>
