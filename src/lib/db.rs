@@ -26,5 +26,5 @@ pub fn transmute_collection<T, U>(coll: Collection<T>) -> Collection<U> {
 }
 
 pub fn transmute_collection_ref<T, U>(coll: &Collection<T>) -> &Collection<U> {
-    unsafe { std::mem::transmute(coll) }
+    unsafe { &*(coll as *const mongodb::Collection<T>).cast() }
 }
