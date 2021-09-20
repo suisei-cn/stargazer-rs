@@ -26,13 +26,13 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn http(&self) -> HTTP {
+    pub const fn http(&self) -> HTTP {
         self.http
     }
-    pub fn schedule(&self) -> Schedule {
+    pub const fn schedule(&self) -> Schedule {
         self.schedule
     }
-    pub fn mongodb(&self) -> &MongoDB {
+    pub const fn mongodb(&self) -> &MongoDB {
         &self.mongodb
     }
 }

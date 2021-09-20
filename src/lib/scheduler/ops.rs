@@ -3,13 +3,13 @@ use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
-use log::info;
 use mongodb::bson::{self, bson, doc, Document};
 use mongodb::error::Result as DBResult;
 use mongodb::options::{FindOneAndUpdateOptions, ReturnDocument};
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::db::{Collection, DBOperation};

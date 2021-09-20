@@ -11,9 +11,8 @@ pub trait DBOperation {
     async fn execute(&self, collection: &Collection) -> DBResult<Self::Result>;
 }
 
-pub async fn connect_db(db_uri: &str, db_name: &str) -> Database {
+pub async fn connect_db(db_uri: &str, db_name: &str) -> DBResult<Database> {
     Client::with_uri_str(db_uri)
         .await
-        .unwrap()
-        .database(db_name)
+        .map(|client| client.database(db_name))
 }

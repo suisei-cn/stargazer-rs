@@ -8,7 +8,7 @@ use actix::{
     Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, ResponseActFuture, ResponseFuture,
     WrapFuture,
 };
-use log::info;
+use tracing::info;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 

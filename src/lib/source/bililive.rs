@@ -3,8 +3,9 @@ use actix::{Actor, ActorContext, ActorFutureExt, AsyncContext, Context, WrapFutu
 use bililive::tokio::connect_with_retry;
 use bililive::{ConfigBuilder, RetryConfig};
 use futures::StreamExt;
-use log::{info, warn};
 use serde::{Deserialize, Serialize};
+use tracing::{info, info_span, warn};
+use tracing_actix::ActorInstrument;
 
 use crate::db::{Collection, Document};
 use crate::scheduler::messages::UpdateTimestamp;
@@ -40,36 +41,31 @@ impl Actor for BililiveActor {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        info!(
-            "BililiveActor {} started, handling {}",
-            self.info.uuid(),
-            self.uid
-        );
+        let task_id = self.info.uuid();
+        let uid = self.uid;
+        info!("BililiveActor {} started, handling {}", task_id, uid);
 
         // update timestamp
-        ctx.run_interval(self.schedule_config.max_interval() / 2, |act, ctx| {
+        ctx.run_interval(self.schedule_config.max_interval() / 2, move |act, ctx| {
             ctx.spawn(
                 act.scheduler
                     .send(UpdateTimestamp(act.info))
                     .into_actor(act)
-                    .map(|res, act, ctx| {
+                    .map(|res, _act, ctx| {
                         if !res.unwrap_or(Ok(false)).unwrap_or(false) {
-                            warn!(
-                                "BililiveActor {} unable to renew ts, trying to stop",
-                                act.info.uuid()
-                            );
+                            warn!("unable to renew ts, trying to stop");
                             // op failed
                             ctx.stop();
                         }
-                    }),
+                    })
+                    .actor_instrument(info_span!("bililive", ?task_id, uid)),
             );
         });
 
-        let uid = self.uid;
         ctx.spawn(
             ready(())
                 .into_actor(self)
-                .then(move |_, this, _| {
+                .then(move |_, act, _| {
                     async move {
                         connect_with_retry(
                             ConfigBuilder::new()
@@ -82,19 +78,15 @@ impl Actor for BililiveActor {
                         )
                         .await
                     }
-                    .into_actor(this)
+                    .into_actor(act)
                 })
-                .map(|stream, this, _| {
+                .map(|stream, _act, _| {
                     if let Err(ref e) = stream {
-                        warn!(
-                            "BililiveActor {} failed to connect stream: {}",
-                            this.info.uuid(),
-                            e
-                        );
+                        warn!("failed to connect stream: {}", e);
                     }
                     stream
                 })
-                .then(move |stream, this, _| {
+                .then(move |stream, act, _| {
                     async move {
                         if let Ok(mut stream) = stream {
                             // poll packet
@@ -105,16 +97,17 @@ impl Actor for BililiveActor {
                                         info!("{:?}", msg);
                                     }
                                     Err(e) => {
-                                        warn!("Bililive {} error: {}", uid, e);
+                                        warn!("stream error: {}", e);
                                         break;
                                     }
                                 }
                             }
                         }
                     }
-                    .into_actor(this)
+                    .into_actor(act)
                 })
-                .map(|_, _, ctx| ctx.stop()),
+                .map(|_, _, ctx| ctx.stop())
+                .actor_instrument(info_span!("bililive", ?task_id, uid)),
         );
     }
 }
