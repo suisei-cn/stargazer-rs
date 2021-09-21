@@ -31,9 +31,9 @@ impl CollectorFactory for AMQPFactory {
     }
 
     async fn build(&self) -> Option<Recipient<Publish>> {
-        async fn _build(uri: &str, exchange: &str) -> Result<AMQPActor> {
+        async fn _build(uri: &str, exchange: &str, update_conn: bool) -> Result<AMQPActor> {
             let mut guard = AMQP_CONNECTION.lock().await;
-            if guard.is_none() {
+            if guard.is_none() || update_conn {
                 *guard = Some(
                     Connection::connect(uri, ConnectionProperties::default().with_tokio()).await?,
                 );
@@ -42,11 +42,16 @@ impl CollectorFactory for AMQPFactory {
             let chan = conn.create_channel().await?;
             AMQPActor::new(chan, exchange).await
         }
-        match _build(self.uri.as_str(), self.exchange.as_str()).await {
+        match _build(self.uri.as_str(), self.exchange.as_str(), false).await {
             Ok(act) => Some(act.start().recipient()),
-            Err(e) => {
-                error!("amqp connect fail: {:?}", e);
-                None
+            Err(_) => {
+                match _build(self.uri.as_str(), self.exchange.as_str(), true).await {
+                    Ok(act) => Some(act.start().recipient()),
+                    Err(e) => {
+                        error!("amqp connect fail: {:?}", e);
+                        None
+                    }
+                }
             }
         }
     }
