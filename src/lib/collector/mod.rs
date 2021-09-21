@@ -82,6 +82,9 @@ pub struct CollectorActor {
     collectors: HashMap<CollectorFactoryWrapped, Context>,
 }
 
+impl_stop_on_panic!(CollectorActor);
+impl_message_target!(pub CollectorTarget, CollectorActor);
+
 impl CollectorActor {
     pub async fn new(factories: Vec<CollectorFactoryWrapped>) -> Self {
         let mut collectors = HashMap::new();

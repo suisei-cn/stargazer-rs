@@ -1,11 +1,56 @@
-use actix::{Actor, ActorContext, ActorFutureExt, Context, Handler, ResponseActFuture, WrapFuture};
+use std::fmt::Debug;
+
+use actix::{
+    Actor, ActorContext, ActorFutureExt, Context, Handler, Recipient, ResponseActFuture, WrapFuture,
+};
+use async_trait::async_trait;
 use lapin::options::{BasicPublishOptions, ExchangeDeclareOptions};
 use lapin::{BasicProperties, Channel, Connection, ConnectionProperties, ExchangeKind, Result};
+use once_cell::sync::Lazy;
+use tokio::sync::Mutex;
 use tokio_amqp::LapinTokioExt;
 use tracing::{error, info_span};
 use tracing_actix::ActorInstrument;
 
+use crate::collector::{Collector, CollectorFactory};
+
 use super::Publish;
+
+static AMQP_CONNECTION: Lazy<Mutex<Option<Connection>>> = Lazy::new(|| Mutex::new(None));
+
+#[derive(Debug)]
+pub struct AMQPFactory {
+    uri: String,
+    exchange: String,
+}
+
+#[async_trait]
+impl CollectorFactory for AMQPFactory {
+    fn ident(&self) -> String {
+        format!("AMQP(uri={}, exchange={})", self.uri, self.exchange)
+    }
+
+    async fn build(&self) -> Option<Recipient<Publish>> {
+        async fn _build(uri: &str, exchange: &str) -> Result<AMQPActor> {
+            let mut guard = AMQP_CONNECTION.lock().await;
+            if guard.is_none() {
+                *guard = Some(
+                    Connection::connect(uri, ConnectionProperties::default().with_tokio()).await?,
+                );
+            }
+            let conn = guard.as_ref().unwrap();
+            let chan = conn.create_channel().await?;
+            AMQPActor::new(chan, exchange).await
+        }
+        match _build(self.uri.as_str(), self.exchange.as_str()).await {
+            Ok(act) => Some(act.start().recipient()),
+            Err(e) => {
+                error!("amqp connect fail: {:?}", e);
+                None
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct AMQPActor {
@@ -13,10 +58,12 @@ pub struct AMQPActor {
     exchange: String,
 }
 
+impl_stop_on_panic!(AMQPActor);
+
+impl Collector for AMQPActor {}
+
 impl AMQPActor {
-    pub async fn new(uri: &str, exchange: &str) -> Result<Self> {
-        let conn = Connection::connect(uri, ConnectionProperties::default().with_tokio()).await?;
-        let channel = conn.create_channel().await?;
+    pub async fn new(channel: Channel, exchange: &str) -> Result<Self> {
         channel
             .exchange_declare(
                 exchange,
