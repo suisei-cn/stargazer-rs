@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::rc::Rc;
 
 use actix::{
     Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, ResponseActFuture, ResponseFuture,
@@ -57,8 +57,8 @@ where
     T: Task,
 {
     pub(crate) collection: Collection<Document>,
-    #[builder(setter(transform = | f: impl Fn() -> T::Ctor + Send + Sync + 'static | Arc::new(f) as Arc < dyn Fn() -> T::Ctor + Send + Sync >))]
-    pub(crate) ctor_builder: Arc<dyn Fn() -> T::Ctor + Send + Sync>,
+    #[builder(setter(transform = | f: impl Fn() -> T::Ctor + Send + Sync + 'static | Rc::new(f) as Rc < dyn Fn() -> T::Ctor + Send + Sync >))]
+    pub(crate) ctor_builder: Rc<dyn Fn() -> T::Ctor + Send + Sync>,
     pub(crate) config: ScheduleConfig,
     #[builder(default, setter(skip))]
     pub(crate) ctx: ScheduleContext<T>,

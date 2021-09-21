@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Deref};
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -45,11 +46,11 @@ pub trait CollectorFactory: Debug {
 }
 
 #[derive(Debug, Clone)]
-pub struct CollectorFactoryWrapped(Arc<dyn CollectorFactory>);
+pub struct CollectorFactoryWrapped(Rc<dyn CollectorFactory>);
 
 impl<T: 'static + CollectorFactory> From<T> for CollectorFactoryWrapped {
     fn from(factory: T) -> Self {
-        Self(Arc::new(factory))
+        Self(Rc::new(factory))
     }
 }
 
@@ -68,7 +69,7 @@ impl PartialEq for CollectorFactoryWrapped {
 impl Eq for CollectorFactoryWrapped {}
 
 impl Deref for CollectorFactoryWrapped {
-    type Target = Arc<dyn CollectorFactory>;
+    type Target = Rc<dyn CollectorFactory>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
