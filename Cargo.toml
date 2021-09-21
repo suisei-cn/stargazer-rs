@@ -16,7 +16,6 @@ path = "src/main.rs"
 [dependencies]
 actix = "0.12"
 actix-web = "4.0.0-beta.9"
-anyhow = "1.0"
 arraydeque = "0.4"
 async-trait = "0.1"
 bililive = { git = "https://github.com/PhotonQuantum/bililive-rs" }
@@ -27,13 +26,11 @@ futures = "0.3"
 humantime-serde = "1.0"
 itertools = "0.10"
 lapin = "1.8"
-log = "0.4"
 mongodb = "2.0.0"
 num_cpus = "1.13"
 once_cell = { version = "1.8", features = ["parking_lot"] }
 parking_lot = "0.11"
 pin-project = "1.0"
-pretty_env_logger = "0.4"
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
