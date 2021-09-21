@@ -8,13 +8,15 @@ use actix::{
 use bililive::tokio::connect_with_retry;
 use bililive::{BililiveError, ConfigBuilder, Packet, RetryConfig};
 use serde::{Deserialize, Serialize};
-use tracing::{info, info_span, warn, Span};
+use tracing::{error, info, info_span, warn, Span};
 use tracing_actix::ActorInstrument;
 
+use crate::collector::{CollectorTarget, Publish};
 use crate::db::{Collection, Document};
+use crate::request::RequestTrait;
 use crate::scheduler::{Task, TaskInfo, Tick, TickOrStop};
 use crate::utils::Scheduler;
-use crate::ScheduleConfig;
+use crate::{ArbiterContext, ScheduleConfig};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct BililiveEntry {
@@ -43,9 +45,9 @@ impl_tick_handler!(BililiveActor);
 
 #[derive(Debug, Clone, Message)]
 #[rtype("()")]
-struct ToCollector<T: Debug>(T);
+struct ToCollector<T: Serialize>(T);
 
-impl<T: 'static + Debug> Handler<ToCollector<T>> for BililiveActor {
+impl<T: 'static + Serialize> Handler<ToCollector<T>> for BililiveActor {
     type Result = ResponseActFuture<Self, ()>;
 
     fn handle(&mut self, msg: ToCollector<T>, ctx: &mut Self::Context) -> Self::Result {
@@ -56,8 +58,14 @@ impl<T: 'static + Debug> Handler<ToCollector<T>> for BililiveActor {
                 .map(move |res, _act, ctx| {
                     let holding_ownership = res.unwrap_or(false);
                     if holding_ownership {
-                        // TODO send to collector
-                        info!("{:?}", msg.0);
+                        ArbiterContext::with(|ctx| {
+                            ctx.send(
+                                CollectorTarget,
+                                Publish::new(String::from("bililive"), msg.0),
+                            )
+                            .unwrap()
+                            .immediately();
+                        });
                     } else {
                         warn!("unable to renew ts, trying to stop");
                         ctx.stop();
@@ -73,10 +81,13 @@ impl StreamHandler<Result<Packet, BililiveError>> for BililiveActor {
         let _span = self.span().entered();
         match item {
             Ok(msg) => {
-                ctx.notify(ToCollector(msg));
+                if let Ok(msg) = msg.json::<serde_json::Value>() {
+                    info!("sending value: {}", serde_json::to_string(&msg).unwrap());
+                    ctx.notify(ToCollector(msg))
+                }
             }
             Err(e) => {
-                warn!("stream error: {}", e);
+                error!("stream error: {}", e);
                 ctx.stop();
             }
         }
