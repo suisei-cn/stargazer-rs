@@ -1,25 +1,11 @@
-use actix::{
-    Actor, ActorContext, ActorFutureExt, Context, Handler, Message, ResponseActFuture, WrapFuture,
-};
+use actix::{Actor, ActorContext, ActorFutureExt, Context, Handler, ResponseActFuture, WrapFuture};
 use lapin::options::{BasicPublishOptions, ExchangeDeclareOptions};
 use lapin::{BasicProperties, Channel, Connection, ConnectionProperties, ExchangeKind, Result};
-use serde::Serialize;
 use tokio_amqp::LapinTokioExt;
 use tracing::{error, info_span};
 use tracing_actix::ActorInstrument;
 
-#[derive(Debug, Clone, Message)]
-#[rtype("Result<()>")]
-pub struct Publish<T> {
-    topic: String,
-    data: T,
-}
-
-impl<T> Publish<T> {
-    pub const fn new(topic: String, data: T) -> Self {
-        Self { topic, data }
-    }
-}
+use super::Publish;
 
 #[derive(Debug, Clone)]
 pub struct AMQPActor {
@@ -53,11 +39,11 @@ impl Actor for AMQPActor {
     type Context = Context<Self>;
 }
 
-impl<T: Serialize> Handler<Publish<T>> for AMQPActor {
-    type Result = ResponseActFuture<Self, Result<()>>;
+impl Handler<Publish> for AMQPActor {
+    type Result = ResponseActFuture<Self, bool>;
 
-    fn handle(&mut self, msg: Publish<T>, _ctx: &mut Self::Context) -> Self::Result {
-        let payload = serde_json::to_vec(&msg.data).unwrap(); // TODO error handling
+    fn handle(&mut self, msg: Publish, _ctx: &mut Self::Context) -> Self::Result {
+        let payload = serde_json::to_vec(&*msg.data).unwrap(); // TODO error handling
         Box::pin(
             self.channel
                 .basic_publish(
@@ -69,11 +55,11 @@ impl<T: Serialize> Handler<Publish<T>> for AMQPActor {
                 )
                 .into_actor(self)
                 .map(|res, _act, ctx| match res {
-                    Ok(_) => Ok(()),
+                    Ok(_) => true,
                     Err(e) => {
                         error!("publish error: {:?}, stopping actor", e);
                         ctx.stop();
-                        Err(e)
+                        false
                     }
                 })
                 .actor_instrument(info_span!("amqp")),
