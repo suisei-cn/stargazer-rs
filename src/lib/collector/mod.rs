@@ -13,9 +13,17 @@ use actix::{
 use arraydeque::{ArrayDeque, Wrapping};
 use async_trait::async_trait;
 use serde::Serialize;
-use tracing::{error, info};
+use tracing::{debug, error, info, info_span, warn, Span};
+use tracing_actix::ActorInstrument;
+
+use crate::ArbiterContext;
 
 pub mod amqp;
+
+fn span() -> Span {
+    let arb_id = ArbiterContext::with(|ctx| ctx.arbiter_id());
+    info_span!("collector", arb=?arb_id)
+}
 
 #[derive(Debug, Clone, Message)]
 #[rtype("bool")]
@@ -146,7 +154,7 @@ impl Handler<Wake> for CollectorActor {
             EstablishConnection,
             EarlyWake(Instant),
         }
-        info!("waking");
+        span().in_scope(|| debug!("waked"));
         if let Some(collector_ctx) = self.collectors.get_mut(&msg.0) {
             let branch = match &mut collector_ctx.state {
                 State::Available(recipient) => Branch::Send(recipient),
@@ -158,14 +166,14 @@ impl Handler<Wake> for CollectorActor {
             };
             match branch {
                 Branch::Send(collector) => {
-                    info!("collector available");
                     let event = collector_ctx.queue.pop_front();
                     if let Some(event) = event {
-                        info!("sending event");
-                        // may send event now
+                        span().in_scope(|| debug!("dispatching event"));
                         AtomicResponse::new(Box::pin(
-                            collector.send(event.clone()).into_actor(self).map(
-                                move |succ, act, ctx| {
+                            collector
+                                .send(event.clone())
+                                .into_actor(self)
+                                .map(move |succ, act, ctx| {
                                     if let Some(collector_ctx) = act.collectors.get_mut(&msg.0) {
                                         if succ.unwrap_or_default() {
                                             // event sent
@@ -174,6 +182,7 @@ impl Handler<Wake> for CollectorActor {
                                                 ctx.notify(msg);
                                             }
                                         } else {
+                                            error!("failed to dispatch event");
                                             // failed to send event
                                             // update state
                                             collector_ctx.state = State::DelayedEstablish(
@@ -188,54 +197,60 @@ impl Handler<Wake> for CollectorActor {
                                     } else {
                                         error!("collector not found");
                                     }
-                                },
-                            ),
+                                })
+                                .actor_instrument(span()),
                         ))
                     } else {
-                        info!("no event");
+                        span()
+                            .in_scope(|| warn!("wake but no event available. this might be a bug"));
                         // no event available
                         AtomicResponse::new(Box::pin(ready(())))
                     }
                 }
                 Branch::EstablishConnection => {
-                    info!("establish");
                     // deadline reached (or uninit), may retry
                     let factory = msg.0.clone();
                     AtomicResponse::new(Box::pin(
-                        async move { factory.build().await }.into_actor(self).map(
-                            move |recipient, act, ctx| {
-                                if let Some(collector_ctx) = act.collectors.get_mut(&msg.0) {
-                                    if let Some(recipient) = recipient {
-                                        // got new recipient
-                                        collector_ctx.state = State::Available(recipient);
-                                        if !collector_ctx.queue.is_empty() {
-                                            // there's event remaining in queue, schedule wake
-                                            ctx.notify(msg);
-                                        }
-                                    } else {
-                                        // failed to build new recipient, schedule delayed wake
-                                        collector_ctx.state = State::DelayedEstablish(
-                                            Instant::now().add(Duration::from_secs(10)), // TODO config retry
-                                        );
-                                        ctx.notify_later(msg, Duration::from_secs(10));
-                                        // TODO config retry
+                        async move {
+                            debug!("establishing connection");
+                            factory.build().await
+                        }
+                        .into_actor(self)
+                        .map(move |recipient, act, ctx| {
+                            if let Some(collector_ctx) = act.collectors.get_mut(&msg.0) {
+                                if let Some(recipient) = recipient {
+                                    info!("connection established");
+                                    // got new recipient
+                                    collector_ctx.state = State::Available(recipient);
+                                    if !collector_ctx.queue.is_empty() {
+                                        // there's event remaining in queue, schedule wake
+                                        ctx.notify(msg);
                                     }
                                 } else {
-                                    error!("collector not found");
+                                    error!("failed to establish connection");
+                                    // failed to build new recipient, schedule delayed wake
+                                    collector_ctx.state = State::DelayedEstablish(
+                                        Instant::now().add(Duration::from_secs(10)), // TODO config retry
+                                    );
+                                    ctx.notify_later(msg, Duration::from_secs(10));
+                                    // TODO config retry
                                 }
-                            },
-                        ),
+                            } else {
+                                error!("collector not found");
+                            }
+                        })
+                        .actor_instrument(span()),
                     ))
                 }
                 Branch::EarlyWake(deadline) => {
-                    info!("early wake");
+                    span().in_scope(|| warn!("early wake"));
                     // early wake
                     ctx.notify_later(msg, deadline.duration_since(Instant::now()));
                     AtomicResponse::new(Box::pin(ready(())))
                 }
             }
         } else {
-            error!("collector not found");
+            span().in_scope(|| error!("collector not found"));
             AtomicResponse::new(Box::pin(ready(())))
         }
     }

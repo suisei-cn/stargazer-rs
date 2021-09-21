@@ -9,7 +9,7 @@ use lapin::{BasicProperties, Channel, Connection, ConnectionProperties, Exchange
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tokio_amqp::LapinTokioExt;
-use tracing::{error, info_span};
+use tracing::{error, info_span, Instrument, Span};
 use tracing_actix::ActorInstrument;
 
 use crate::collector::{Collector, CollectorFactory};
@@ -31,6 +31,9 @@ impl AMQPFactory {
             exchange: exchange.to_string(),
         }
     }
+    fn span(&self) -> Span {
+        info_span!("amqp_factory", uri = %self.uri, exchange = %self.exchange)
+    }
 }
 
 #[async_trait]
@@ -49,14 +52,21 @@ impl CollectorFactory for AMQPFactory {
             }
             let conn = guard.as_ref().unwrap();
             let chan = conn.create_channel().await?;
-            AMQPActor::new(chan, exchange).await
+            AMQPActor::new(chan, uri, exchange).await
         }
-        match _build(self.uri.as_str(), self.exchange.as_str(), false).await {
+        match _build(self.uri.as_str(), self.exchange.as_str(), false)
+            .instrument(self.span())
+            .await
+        {
             Ok(act) => Some(act.start().recipient()),
-            Err(_) => match _build(self.uri.as_str(), self.exchange.as_str(), true).await {
+            Err(_) => match _build(self.uri.as_str(), self.exchange.as_str(), true)
+                .instrument(self.span())
+                .await
+            {
                 Ok(act) => Some(act.start().recipient()),
                 Err(e) => {
-                    error!("amqp connect fail: {:?}", e);
+                    self.span()
+                        .in_scope(|| error!("amqp connect fail: {:?}", e));
                     None
                 }
             },
@@ -67,6 +77,7 @@ impl CollectorFactory for AMQPFactory {
 #[derive(Debug, Clone)]
 pub struct AMQPActor {
     channel: Channel,
+    uri: String,
     exchange: String,
 }
 
@@ -75,7 +86,7 @@ impl_stop_on_panic!(AMQPActor);
 impl Collector for AMQPActor {}
 
 impl AMQPActor {
-    pub async fn new(channel: Channel, exchange: &str) -> Result<Self> {
+    pub async fn new(channel: Channel, uri: &str, exchange: &str) -> Result<Self> {
         channel
             .exchange_declare(
                 exchange,
@@ -89,8 +100,13 @@ impl AMQPActor {
             .await?;
         Ok(Self {
             channel,
+            uri: uri.to_string(),
             exchange: exchange.to_string(),
         })
+    }
+
+    fn span(&self) -> Span {
+        info_span!("amqp", uri=%self.uri, exchange=%self.exchange)
     }
 }
 
@@ -121,7 +137,7 @@ impl Handler<Publish> for AMQPActor {
                         false
                     }
                 })
-                .actor_instrument(info_span!("amqp")),
+                .actor_instrument(self.span()),
         )
     }
 }
