@@ -24,6 +24,12 @@ pub struct AMQPFactory {
     exchange: String,
 }
 
+impl AMQPFactory {
+    pub fn new(uri: &str, exchange: &str) -> Self {
+        AMQPFactory { uri: uri.to_string(), exchange: exchange.to_string() }
+    }
+}
+
 #[async_trait]
 impl CollectorFactory for AMQPFactory {
     fn ident(&self) -> String {

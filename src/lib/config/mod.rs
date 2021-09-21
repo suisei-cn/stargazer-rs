@@ -16,6 +16,7 @@ mod tests;
 pub type ScheduleConfig = Schedule;
 pub type HTTPConfig = HTTP;
 pub type MongoDBConfig = MongoDB;
+pub type AMQPConfig = AMQP;
 
 /// Contains all configuration to run the application.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
@@ -23,6 +24,7 @@ pub struct Config {
     http: HTTP,
     schedule: Schedule,
     mongodb: MongoDB,
+    amqp: AMQP
 }
 
 impl Config {
@@ -34,6 +36,9 @@ impl Config {
     }
     pub const fn mongodb(&self) -> &MongoDB {
         &self.mongodb
+    }
+    pub const fn amqp(&self) -> &AMQP {
+        &self.amqp
     }
 }
 
@@ -80,6 +85,25 @@ impl Default for HTTP {
         Self::Enabled {
             host: IpAddr::V4(Ipv4Addr::LOCALHOST),
             port: 8080,
+        }
+    }
+}
+
+// TODO workaround before https://github.com/serde-rs/serde/pull/2056 is merged
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+// #[serde(tag = "enabled")]
+pub enum AMQP {
+    // #[serde(rename = false)]
+    Disabled,
+    // #[serde(rename = true)]
+    Enabled { uri: String, exchange: String },
+}
+
+impl Default for AMQP {
+    fn default() -> Self {
+        Self::Enabled {
+            uri: String::from("amqp://127.0.0.1"),
+            exchange: String::from("stargazer"),
         }
     }
 }
@@ -203,6 +227,72 @@ impl<'de> Deserialize<'de> for HTTP {
                 port: value
                     .get("port")
                     .ok_or_else(|| de::Error::missing_field("port"))
+                    .map(Deserialize::deserialize)?
+                    .map_err(de::Error::custom)?,
+            }
+        } else {
+            Self::Disabled
+        })
+    }
+}
+
+impl Serialize for AMQP {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+    {
+        #[derive(Serialize)]
+        #[serde(untagged)]
+        enum Body {
+            Disabled,
+            Enabled { uri: String, exchange: String },
+        }
+        #[derive(Serialize)]
+        struct Tagged {
+            enabled: bool,
+            #[serde(flatten)]
+            body: Body,
+        }
+        match self {
+            AMQP::Disabled => Tagged {
+                enabled: false,
+                body: Body::Disabled,
+            },
+            AMQP::Enabled { uri, exchange } => Tagged {
+                enabled: true,
+                body: Body::Enabled {
+                    uri: uri.clone(),
+                    exchange: exchange.clone()
+                },
+            },
+        }
+            .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for AMQP {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+    {
+        let value = serde_json::Map::deserialize(deserializer)?;
+
+        let enabled = value
+            .get("enabled")
+            .ok_or_else(|| de::Error::missing_field("enabled"))
+            .map(Deserialize::deserialize)?
+            .map_err(de::Error::custom)?;
+
+        Ok(if enabled {
+            Self::Enabled {
+                uri: value
+                    .get("uri")
+                    .ok_or_else(|| de::Error::missing_field("uri"))
+                    .map(Deserialize::deserialize)?
+                    .map_err(de::Error::custom)?,
+                exchange: value
+                    .get("exchange")
+                    .ok_or_else(|| de::Error::missing_field("exchange"))
                     .map(Deserialize::deserialize)?
                     .map_err(de::Error::custom)?,
             }
