@@ -11,7 +11,10 @@ max_interval = "1m"
 uri = "mongodb://localhost"
 database = "stargazer"
 
-[amqp]
+[collector.amqp]
 enabled = true
 uri = "amqp://127.0.0.1"
 exchange = "stargazer"
+
+[collector.debug]
+enabled = true

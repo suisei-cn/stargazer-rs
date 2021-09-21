@@ -24,7 +24,7 @@ pub struct Config {
     http: HTTP,
     schedule: Schedule,
     mongodb: MongoDB,
-    amqp: AMQP,
+    collector: Collector,
 }
 
 impl Config {
@@ -37,8 +37,8 @@ impl Config {
     pub const fn mongodb(&self) -> &MongoDB {
         &self.mongodb
     }
-    pub const fn amqp(&self) -> &AMQP {
-        &self.amqp
+    pub const fn collector(&self) -> &Collector {
+        &self.collector
     }
 }
 
@@ -89,25 +89,6 @@ impl Default for HTTP {
     }
 }
 
-// TODO workaround before https://github.com/serde-rs/serde/pull/2056 is merged
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-// #[serde(tag = "enabled")]
-pub enum AMQP {
-    // #[serde(rename = false)]
-    Disabled,
-    // #[serde(rename = true)]
-    Enabled { uri: String, exchange: String },
-}
-
-impl Default for AMQP {
-    fn default() -> Self {
-        Self::Enabled {
-            uri: String::from("amqp://127.0.0.1"),
-            exchange: String::from("stargazer"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct MongoDB {
     uri: String,
@@ -129,6 +110,51 @@ impl Default for MongoDB {
             uri: String::from("mongodb://localhost"),
             database: String::from("stargazer"),
         }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
+pub struct Collector {
+    amqp: AMQP,
+    debug: DebugCollector,
+}
+
+impl Collector {
+    pub fn amqp(&self) -> &AMQP {
+        &self.amqp
+    }
+    pub fn debug(&self) -> DebugCollector {
+        self.debug
+    }
+}
+
+// TODO workaround before https://github.com/serde-rs/serde/pull/2056 is merged
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+// #[serde(tag = "enabled")]
+pub enum AMQP {
+    // #[serde(rename = false)]
+    Disabled,
+    // #[serde(rename = true)]
+    Enabled { uri: String, exchange: String },
+}
+
+impl Default for AMQP {
+    fn default() -> Self {
+        Self::Enabled {
+            uri: String::from("amqp://127.0.0.1"),
+            exchange: String::from("stargazer"),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Default)]
+pub struct DebugCollector {
+    enabled: bool,
+}
+
+impl DebugCollector {
+    pub fn enabled(&self) -> bool {
+        self.enabled
     }
 }
 

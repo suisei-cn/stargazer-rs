@@ -19,6 +19,7 @@ use tracing_actix::ActorInstrument;
 use crate::ArbiterContext;
 
 pub mod amqp;
+pub mod debug;
 
 fn span() -> Span {
     let arb_id = ArbiterContext::with(|ctx| ctx.arbiter_id());

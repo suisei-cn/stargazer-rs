@@ -8,7 +8,7 @@ use actix::{
 use bililive::tokio::connect_with_retry;
 use bililive::{BililiveError, ConfigBuilder, Packet, RetryConfig};
 use serde::{Deserialize, Serialize};
-use tracing::{error, info, info_span, warn, Span};
+use tracing::{debug, error, info, info_span, warn, Span};
 use tracing_actix::ActorInstrument;
 
 use crate::collector::{CollectorTarget, Publish};
@@ -82,7 +82,7 @@ impl StreamHandler<Result<Packet, BililiveError>> for BililiveActor {
         match item {
             Ok(msg) => {
                 if let Ok(msg) = msg.json::<serde_json::Value>() {
-                    info!("sending value: {}", serde_json::to_string(&msg).unwrap());
+                    debug!("publishing event to collector");
                     ctx.notify(ToCollector(msg));
                 }
             }

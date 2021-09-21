@@ -4,6 +4,7 @@ use actix::Actor;
 use clap::{AppSettings, Clap};
 
 use stargazer_lib::collector::amqp::AMQPFactory;
+use stargazer_lib::collector::debug::DebugCollectorFactory;
 use stargazer_lib::collector::CollectorActor;
 use stargazer_lib::db::{connect_db, Collection, Document};
 use stargazer_lib::scheduler::ScheduleActor;
@@ -28,7 +29,7 @@ async fn main() {
 
     let opts = Opts::parse();
     let config = Config::new(opts.config.as_deref()).unwrap();
-    let amqp_config = config.amqp().clone();
+    let collector_config = config.collector().clone();
 
     let db = connect_db(config.mongodb().uri(), config.mongodb().database())
         .await
@@ -36,6 +37,7 @@ async fn main() {
     let coll: Collection<Document> = db.collection("bililive");
 
     Server::new(move |instance_id| {
+        let collector_config = collector_config.clone();
         let ctx = ArbiterContext::new(instance_id);
 
         let bililive_actor: ScheduleActor<BililiveActor> = ScheduleActor::builder()
@@ -46,8 +48,11 @@ async fn main() {
         let bililive_addr = bililive_actor.start();
 
         let mut collector_factories = Vec::new();
-        if let AMQP::Enabled { uri, exchange } = amqp_config.clone() {
+        if let AMQP::Enabled { uri, exchange } = collector_config.amqp() {
             collector_factories.push(AMQPFactory::new(uri.as_str(), exchange.as_str()).into());
+        }
+        if collector_config.debug().enabled() {
+            collector_factories.push(DebugCollectorFactory.into());
         }
         let collector_actor = CollectorActor::new(collector_factories);
         let collector_addr = collector_actor.start();
