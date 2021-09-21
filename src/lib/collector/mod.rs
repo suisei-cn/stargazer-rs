@@ -144,7 +144,7 @@ impl Handler<Wake> for CollectorActor {
                                     if let Some(collector_ctx) = act.collectors.get_mut(&msg.0) {
                                         if succ.unwrap_or_default() {
                                             // event sent
-                                            if collector_ctx.queue.is_empty() {
+                                            if !collector_ctx.queue.is_empty() {
                                                 // there's event remaining in queue, schedule wake
                                                 ctx.notify(msg);
                                             }
@@ -182,7 +182,7 @@ impl Handler<Wake> for CollectorActor {
                                         if let Some(recipient) = recipient {
                                             // got new recipient
                                             collector_ctx.state = State::Available(recipient);
-                                            if collector_ctx.queue.is_empty() {
+                                            if !collector_ctx.queue.is_empty() {
                                                 // there's event remaining in queue, schedule wake
                                                 ctx.notify(msg);
                                             }
