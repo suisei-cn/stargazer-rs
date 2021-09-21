@@ -11,7 +11,7 @@ use actix::{
 };
 use async_trait::async_trait;
 use serde::Serialize;
-use tracing::error;
+use tracing::{error, info};
 
 pub mod amqp;
 
@@ -68,11 +68,20 @@ impl Deref for CollectorFactoryWrapped {
     }
 }
 
+#[derive(Debug)]
 enum State {
     Available(Recipient<Publish>),
     DelayedEstablish(Instant),
+    Uninit,
 }
 
+impl Default for State {
+    fn default() -> Self {
+        State::Uninit
+    }
+}
+
+#[derive(Debug, Default)]
 struct Context {
     state: State,
     queue: VecDeque<Publish>,
@@ -86,22 +95,13 @@ impl_stop_on_panic!(CollectorActor);
 impl_message_target!(pub CollectorTarget, CollectorActor);
 
 impl CollectorActor {
-    pub async fn new(factories: Vec<CollectorFactoryWrapped>) -> Self {
-        let mut collectors = HashMap::new();
-        for factory in factories {
-            let state = factory.clone().build().await.map_or_else(
-                || State::DelayedEstablish(Instant::now().add(Duration::from_secs(10))), // TODO config retry
-                State::Available,
-            );
-            collectors.insert(
-                factory,
-                Context {
-                    state,
-                    queue: Default::default(),
-                },
-            );
+    pub fn new(factories: Vec<CollectorFactoryWrapped>) -> Self {
+        Self {
+            collectors: factories
+                .into_iter()
+                .map(|factory| (factory, Context::default()))
+                .collect(),
         }
-        Self { collectors }
     }
 }
 
@@ -117,9 +117,9 @@ impl Handler<Publish> for CollectorActor {
             .iter_mut()
             .for_each(|(factory, collector_ctx)| {
                 if matches!(collector_ctx.state, State::Available(_))
-                    && collector_ctx.queue.is_empty()
+                    && collector_ctx.queue.is_empty() || matches!(collector_ctx.state, State::Uninit)
                 {
-                    // collector available & queue empty, schedule wake
+                    // collector available & queue empty | lazy init, schedule wake
                     ctx.notify(Wake(factory.clone()));
                 }
                 collector_ctx.queue.push_back(msg.clone());
@@ -132,11 +132,14 @@ impl Handler<Wake> for CollectorActor {
     type Result = AtomicResponse<Self, ()>;
 
     fn handle(&mut self, msg: Wake, ctx: &mut Self::Context) -> Self::Result {
+        info!("waking");
         if let Some(collector_ctx) = self.collectors.get_mut(&msg.0) {
             match &mut collector_ctx.state {
                 State::Available(collector) => {
+                    info!("collector available");
                     let event = collector_ctx.queue.pop_front();
                     if let Some(event) = event {
+                        info!("sending event");
                         // may send event now
                         AtomicResponse::new(Box::pin(
                             collector.send(event.clone()).into_actor(self).map(
@@ -167,12 +170,14 @@ impl Handler<Wake> for CollectorActor {
                             ),
                         ))
                     } else {
+                        info!("no event");
                         // no event available
                         AtomicResponse::new(Box::pin(ready(())))
                     }
                 }
                 State::DelayedEstablish(deadline) => {
                     if Instant::now() >= *deadline {
+                        info!("delayed establish");
                         // deadline reached, may retry
                         let factory = msg.0.clone();
                         AtomicResponse::new(Box::pin(
@@ -201,10 +206,40 @@ impl Handler<Wake> for CollectorActor {
                             ),
                         ))
                     } else {
+                        info!("early wake");
                         // early wake
                         ctx.notify_later(msg, deadline.duration_since(Instant::now()));
                         AtomicResponse::new(Box::pin(ready(())))
                     }
+                }
+                State::Uninit => {
+                    info!("init");
+                    let factory = msg.0.clone();
+                    AtomicResponse::new(Box::pin(
+                        async move { factory.build().await }.into_actor(self).map(
+                            move |recipient, act, ctx| {
+                                if let Some(collector_ctx) = act.collectors.get_mut(&msg.0) {
+                                    if let Some(recipient) = recipient {
+                                        // got new recipient
+                                        collector_ctx.state = State::Available(recipient);
+                                        if !collector_ctx.queue.is_empty() {
+                                            // there's event remaining in queue, schedule wake
+                                            ctx.notify(msg);
+                                        }
+                                    } else {
+                                        // failed to build new recipient, schedule delayed wake
+                                        collector_ctx.state = State::DelayedEstablish(
+                                            Instant::now().add(Duration::from_secs(10)), // TODO config retry
+                                        );
+                                        ctx.notify_later(msg, Duration::from_secs(10));
+                                        // TODO config retry
+                                    }
+                                } else {
+                                    error!("collector not found");
+                                }
+                            },
+                        ),
+                    ))
                 }
             }
         } else {
