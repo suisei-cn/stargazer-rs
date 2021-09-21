@@ -103,6 +103,7 @@ impl Actor for BililiveActor {
         });
 
         // update timestamp
+        // TODO may not wake on time, investigation needed
         ctx.run_interval(self.schedule_config.max_interval() / 2, |_, ctx| {
             ctx.notify(TickOrStop);
         });
