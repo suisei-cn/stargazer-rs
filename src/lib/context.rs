@@ -5,6 +5,7 @@ use std::sync::Arc;
 use actix::dev::ToEnvelope;
 use actix::{Actor, Addr, Handler, MailboxError, Message};
 use itertools::Itertools;
+use once_cell::unsync::OnceCell;
 use uuid::Uuid;
 
 use crate::error::{Error, Result};
@@ -13,6 +14,10 @@ use crate::scheduler::messages::GetId;
 use crate::utils::TypeEq;
 
 type StdResult<T, E> = std::result::Result<T, E>;
+
+thread_local! {
+    static LOCAL_ARBITER_CONTEXT: OnceCell<ArbiterContext> = OnceCell::new();
+}
 
 pub trait MessageTarget: Copy + Send {
     type Actor: Actor;
@@ -32,6 +37,27 @@ impl ArbiterContext {
     }
     pub const fn arbiter_id(&self) -> Uuid {
         self.arbiter_id
+    }
+}
+
+impl ArbiterContext {
+    pub fn set(obj: Self) {
+        LOCAL_ARBITER_CONTEXT.with(|cell| {
+            cell.set(obj)
+                .expect("can't set local arbiter context again");
+        });
+    }
+    pub fn try_get() -> Option<Self> {
+        LOCAL_ARBITER_CONTEXT.with(|cell| cell.get().cloned())
+    }
+    pub fn get() -> Self {
+        Self::try_get().expect("no arbiter context available")
+    }
+    pub fn with<F, R>(f: F) -> R
+    where
+        F: FnOnce(&ArbiterContext) -> R,
+    {
+        LOCAL_ARBITER_CONTEXT.with(|cell| f(cell.get().unwrap()))
     }
 }
 

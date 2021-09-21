@@ -135,6 +135,7 @@ where
                     arb.spawn_fn(move || {
                         let (ctx, _) = factory(instance_id);
                         WatchdogActor::start(tx);
+                        ArbiterContext::set(ctx.clone());
                         instance_ctx.write().register(ctx);
                     });
                 };
@@ -151,6 +152,7 @@ where
             ServerMode::HTTP { port } => {
                 let srv = HttpServer::new(move || {
                     let (ctx, http_services) = factory(instance_id);
+                    ArbiterContext::set(ctx.clone());
                     instance_ctx.write().register(ctx.clone());
                     App::new()
                         .wrap(Logger::default())
