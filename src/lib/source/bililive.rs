@@ -83,7 +83,7 @@ impl StreamHandler<Result<Packet, BililiveError>> for BililiveActor {
             Ok(msg) => {
                 if let Ok(msg) = msg.json::<serde_json::Value>() {
                     info!("sending value: {}", serde_json::to_string(&msg).unwrap());
-                    ctx.notify(ToCollector(msg))
+                    ctx.notify(ToCollector(msg));
                 }
             }
             Err(e) => {

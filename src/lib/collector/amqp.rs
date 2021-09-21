@@ -26,7 +26,10 @@ pub struct AMQPFactory {
 
 impl AMQPFactory {
     pub fn new(uri: &str, exchange: &str) -> Self {
-        AMQPFactory { uri: uri.to_string(), exchange: exchange.to_string() }
+        AMQPFactory {
+            uri: uri.to_string(),
+            exchange: exchange.to_string(),
+        }
     }
 }
 
@@ -50,15 +53,13 @@ impl CollectorFactory for AMQPFactory {
         }
         match _build(self.uri.as_str(), self.exchange.as_str(), false).await {
             Ok(act) => Some(act.start().recipient()),
-            Err(_) => {
-                match _build(self.uri.as_str(), self.exchange.as_str(), true).await {
-                    Ok(act) => Some(act.start().recipient()),
-                    Err(e) => {
-                        error!("amqp connect fail: {:?}", e);
-                        None
-                    }
+            Err(_) => match _build(self.uri.as_str(), self.exchange.as_str(), true).await {
+                Ok(act) => Some(act.start().recipient()),
+                Err(e) => {
+                    error!("amqp connect fail: {:?}", e);
+                    None
                 }
-            }
+            },
         }
     }
 }

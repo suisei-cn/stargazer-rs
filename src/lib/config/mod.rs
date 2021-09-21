@@ -24,7 +24,7 @@ pub struct Config {
     http: HTTP,
     schedule: Schedule,
     mongodb: MongoDB,
-    amqp: AMQP
+    amqp: AMQP,
 }
 
 impl Config {
@@ -238,8 +238,8 @@ impl<'de> Deserialize<'de> for HTTP {
 
 impl Serialize for AMQP {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         #[derive(Serialize)]
         #[serde(untagged)]
@@ -262,18 +262,18 @@ impl Serialize for AMQP {
                 enabled: true,
                 body: Body::Enabled {
                     uri: uri.clone(),
-                    exchange: exchange.clone()
+                    exchange: exchange.clone(),
                 },
             },
         }
-            .serialize(serializer)
+        .serialize(serializer)
     }
 }
 
 impl<'de> Deserialize<'de> for AMQP {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let value = serde_json::Map::deserialize(deserializer)?;
 

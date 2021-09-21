@@ -3,12 +3,12 @@ use std::path::PathBuf;
 use actix::Actor;
 use clap::{AppSettings, Clap};
 
+use stargazer_lib::collector::amqp::AMQPFactory;
+use stargazer_lib::collector::CollectorActor;
 use stargazer_lib::db::{connect_db, Collection, Document};
 use stargazer_lib::scheduler::ScheduleActor;
 use stargazer_lib::source::bililive::BililiveActor;
-use stargazer_lib::collector::CollectorActor;
 use stargazer_lib::{ArbiterContext, Config, ScheduleConfig, Server, AMQP};
-use stargazer_lib::collector::amqp::AMQPFactory;
 
 #[derive(Clap)]
 #[clap(
@@ -53,7 +53,11 @@ async fn main() {
         let collector_addr = collector_actor.start();
 
         // register actor addrs
-        (ctx.register_addr(bililive_addr).register_addr(collector_addr), |_| {})
+        (
+            ctx.register_addr(bililive_addr)
+                .register_addr(collector_addr),
+            |_| {},
+        )
     })
     .run(config.http().into())
     .unwrap()
