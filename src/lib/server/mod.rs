@@ -5,11 +5,12 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use actix::Arbiter;
+use actix::{Arbiter, SystemService};
 use actix_web::dev::Server as WebServer;
 use actix_web::middleware::Logger;
 use actix_web::web::{Data, ServiceConfig};
-use actix_web::{App, HttpServer};
+use actix_web::App;
+use actix_web::HttpServer;
 use parking_lot::RwLock;
 use pin_project::pin_project;
 use tokio::sync::mpsc::unbounded_channel;
@@ -17,6 +18,7 @@ use uuid::Uuid;
 
 use handler::ArbiterHandler;
 pub use killer::KillerActor;
+use killer::RegisterHttpServer;
 
 use crate::context::{ArbiterContext, InstanceContext};
 use crate::server::watchdog::WatchdogActor;
@@ -143,7 +145,7 @@ where
                     (arb_factory.clone())();
                 }
 
-                KillerActor::start(None);
+                KillerActor::from_registry();
                 Ok(ServerHandler::NoHTTP(ArbiterHandler::new(
                     self.workers,
                     stop_rx,
@@ -164,7 +166,7 @@ where
                 .bind(port)?
                 .run();
 
-                KillerActor::start(Some(srv.clone()));
+                KillerActor::from_registry().do_send(RegisterHttpServer::new(srv.clone()));
                 Ok(ServerHandler::HTTP(srv))
             }
         }

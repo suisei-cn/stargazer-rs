@@ -1,10 +1,14 @@
-use std::cell::Cell;
-
-use actix::{Actor, Addr, Context, Handler, Message, System};
+use actix::{Actor, Context, Handler, Message, Supervised, System, SystemService};
 use actix_web::dev::Server as ActixServer;
 
-thread_local! {
-    static LOCAL_KILLER: Cell<Option<Addr<KillerActor>>> = Cell::new(None);
+#[derive(Debug, Clone, Message)]
+#[rtype("()")]
+pub struct RegisterHttpServer(ActixServer);
+
+impl RegisterHttpServer {
+    pub const fn new(srv: ActixServer) -> Self {
+        Self(srv)
+    }
 }
 
 #[derive(Debug, Copy, Clone, Message)]
@@ -23,32 +27,29 @@ impl Kill {
 pub struct KillerActor(Option<ActixServer>);
 
 impl KillerActor {
-    /// Start `KillerActor` on the current arbiter with given server handler.
-    ///
-    /// # Panics
-    /// Panics when there's already a `KillerActor` on the same arbiter.
-    pub fn start(srv: Option<ActixServer>) {
-        let act = Self(srv);
-        let addr = act.start();
-        LOCAL_KILLER.with(|f| {
-            assert!(
-                f.replace(Some(addr)).is_none(),
-                "cannot run two killers on the same arbiter"
-            );
-        });
+    pub fn new() -> Self {
+        Default::default()
     }
 
     pub fn kill(graceful: bool) {
-        LOCAL_KILLER.with(|f| {
-            if let Some(killer) = f.replace(None) {
-                killer.do_send(Kill::new(graceful));
-            }
-        });
+        Self::from_registry().do_send(Kill::new(graceful));
     }
 }
 
 impl Actor for KillerActor {
     type Context = Context<Self>;
+}
+
+impl Supervised for KillerActor {}
+
+impl SystemService for KillerActor {}
+
+impl Handler<RegisterHttpServer> for KillerActor {
+    type Result = ();
+
+    fn handle(&mut self, msg: RegisterHttpServer, _ctx: &mut Self::Context) -> Self::Result {
+        self.0 = Some(msg.0);
+    }
 }
 
 impl Handler<Kill> for KillerActor {
