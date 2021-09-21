@@ -22,7 +22,7 @@ pub mod amqp;
 pub mod debug;
 
 fn span() -> Span {
-    let arb_id = ArbiterContext::with(|ctx| ctx.arbiter_id());
+    let arb_id = ArbiterContext::with(ArbiterContext::arbiter_id);
     info_span!("collector", arb=?arb_id)
 }
 
@@ -34,6 +34,10 @@ pub struct Publish {
 }
 
 impl Publish {
+    /// Creates a new `Publish` event.
+    ///
+    /// # Panics
+    /// Panics when given `data` can't be serialized into json.
     pub fn new<T: Serialize>(topic: String, data: T) -> Self {
         Self {
             topic,
@@ -94,7 +98,7 @@ enum State {
 
 impl Default for State {
     fn default() -> Self {
-        State::Uninit
+        Self::Uninit
     }
 }
 
@@ -149,6 +153,8 @@ impl Handler<Publish> for CollectorActor {
 impl Handler<Wake> for CollectorActor {
     type Result = AtomicResponse<Self, ()>;
 
+    // TODO blocked by edition 2021
+    #[allow(clippy::option_if_let_else)]
     fn handle(&mut self, msg: Wake, ctx: &mut Self::Context) -> Self::Result {
         enum Branch<'a> {
             Send(&'a mut Recipient<Publish>),

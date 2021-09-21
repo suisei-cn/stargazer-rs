@@ -79,6 +79,7 @@ impl<T> Handler<TrySchedule<T>> for ScheduleActor<T>
 where
     T: 'static + Task + Actor<Context = Context<T>> + Unpin,
 {
+    #[allow(clippy::type_complexity)]
     type Result = ResponseActFuture<Self, DBResult<Option<(Uuid, Addr<T>)>>>;
 
     fn handle(&mut self, _msg: TrySchedule<T>, ctx: &mut Self::Context) -> Self::Result {

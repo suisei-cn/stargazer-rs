@@ -41,18 +41,33 @@ impl ArbiterContext {
 }
 
 impl ArbiterContext {
+    /// Set the thread local arbiter context.
+    ///
+    /// # Panics
+    /// Panics when the local arbiter has already been set.
     pub fn set(obj: Self) {
         LOCAL_ARBITER_CONTEXT.with(|cell| {
             cell.set(obj)
                 .expect("can't set local arbiter context again");
         });
     }
+    /// Try to get the thread local arbiter context.
+    /// Returns `None` if no arbiter context is registered on current thread.
     pub fn try_get() -> Option<Self> {
         LOCAL_ARBITER_CONTEXT.with(|cell| cell.get().cloned())
     }
+    /// Get the thread local arbiter context.
+    ///
+    /// # Panics
+    /// Panics when no arbiter context is registered on current thread.
     pub fn get() -> Self {
         Self::try_get().expect("no arbiter context available")
     }
+    /// Acquires a reference to the thread local arbiter context.
+    ///
+    /// # Panics
+    /// Panics when no arbiter context is registered on current thread.
+    #[allow(clippy::use_self)]
     pub fn with<F, R>(f: F) -> R
     where
         F: FnOnce(&ArbiterContext) -> R,

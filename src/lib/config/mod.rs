@@ -120,10 +120,10 @@ pub struct Collector {
 }
 
 impl Collector {
-    pub fn amqp(&self) -> &AMQP {
+    pub const fn amqp(&self) -> &AMQP {
         &self.amqp
     }
-    pub fn debug(&self) -> DebugCollector {
+    pub const fn debug(&self) -> DebugCollector {
         self.debug
     }
 }
@@ -153,7 +153,7 @@ pub struct DebugCollector {
 }
 
 impl DebugCollector {
-    pub fn enabled(&self) -> bool {
+    pub const fn enabled(&self) -> bool {
         self.enabled
     }
 }

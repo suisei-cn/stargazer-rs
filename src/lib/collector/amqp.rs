@@ -26,7 +26,7 @@ pub struct AMQPFactory {
 
 impl AMQPFactory {
     pub fn new(uri: &str, exchange: &str) -> Self {
-        AMQPFactory {
+        Self {
             uri: uri.to_string(),
             exchange: exchange.to_string(),
         }
@@ -86,6 +86,11 @@ impl_stop_on_panic!(AMQPActor);
 impl Collector for AMQPActor {}
 
 impl AMQPActor {
+    /// Creates a new `AMQPActor` with given channel and exchange.
+    /// The `uri` parameter is for logging usage.
+    ///
+    /// # Errors
+    /// Raise errors if unable to declare exchange on current channel.
     pub async fn new(channel: Channel, uri: &str, exchange: &str) -> Result<Self> {
         channel
             .exchange_declare(

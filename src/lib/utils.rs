@@ -106,6 +106,7 @@ macro_rules! impl_tick_handler {
     };
 }
 
+#[allow(clippy::cast_possible_truncation)]
 pub fn timestamp(t: SystemTime) -> i64 {
     t.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64
 }

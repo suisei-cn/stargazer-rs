@@ -15,6 +15,10 @@ pub trait DBOperation {
     }
 }
 
+/// Connect to mongodb database.
+///
+/// # Errors
+/// Pass errors raised by mongodb driver.
 pub async fn connect_db(db_uri: &str, db_name: &str) -> DBResult<Database> {
     Client::with_uri_str(db_uri)
         .await
@@ -25,6 +29,7 @@ pub fn transmute_collection<T, U>(coll: Collection<T>) -> Collection<U> {
     unsafe { std::mem::transmute(coll) }
 }
 
+#[allow(clippy::missing_const_for_fn)]
 pub fn transmute_collection_ref<T, U>(coll: &Collection<T>) -> &Collection<U> {
     unsafe { &*(coll as *const mongodb::Collection<T>).cast() }
 }

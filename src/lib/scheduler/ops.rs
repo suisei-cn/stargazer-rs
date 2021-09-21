@@ -46,6 +46,7 @@ impl DBOperation for UpdateTSOp {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ScheduleMode {
     // Schedule outdated task. If failed, randomly schedule a task from another scheduler.
