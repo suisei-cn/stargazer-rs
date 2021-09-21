@@ -46,6 +46,12 @@ pub trait CollectorFactory: Debug {
 #[derive(Debug, Clone)]
 pub struct CollectorFactoryWrapped(Arc<dyn CollectorFactory>);
 
+impl<T: 'static + CollectorFactory> From<T> for CollectorFactoryWrapped {
+    fn from(factory: T) -> Self {
+        Self(Arc::new(factory))
+    }
+}
+
 impl Hash for CollectorFactoryWrapped {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.ident().hash(state);
