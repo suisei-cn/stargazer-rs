@@ -123,7 +123,8 @@ impl Handler<Publish> for CollectorActor {
             .iter_mut()
             .for_each(|(factory, collector_ctx)| {
                 if matches!(collector_ctx.state, State::Available(_))
-                    && collector_ctx.queue.is_empty() || matches!(collector_ctx.state, State::Uninit)
+                    && collector_ctx.queue.is_empty()
+                    || matches!(collector_ctx.state, State::Uninit)
                 {
                     // collector available & queue empty | lazy init, schedule wake
                     ctx.notify(Wake(factory.clone()));
@@ -181,45 +182,11 @@ impl Handler<Wake> for CollectorActor {
                         AtomicResponse::new(Box::pin(ready(())))
                     }
                 }
-                State::DelayedEstablish(deadline) => {
-                    if Instant::now() >= *deadline {
-                        info!("delayed establish");
-                        // deadline reached, may retry
-                        let factory = msg.0.clone();
-                        AtomicResponse::new(Box::pin(
-                            async move { factory.build().await }.into_actor(self).map(
-                                move |recipient, act, ctx| {
-                                    if let Some(collector_ctx) = act.collectors.get_mut(&msg.0) {
-                                        if let Some(recipient) = recipient {
-                                            // got new recipient
-                                            collector_ctx.state = State::Available(recipient);
-                                            if !collector_ctx.queue.is_empty() {
-                                                // there's event remaining in queue, schedule wake
-                                                ctx.notify(msg);
-                                            }
-                                        } else {
-                                            // failed to build new recipient, schedule delayed wake
-                                            collector_ctx.state = State::DelayedEstablish(
-                                                Instant::now().add(Duration::from_secs(10)), // TODO config retry
-                                            );
-                                            ctx.notify_later(msg, Duration::from_secs(10));
-                                            // TODO config retry
-                                        }
-                                    } else {
-                                        error!("collector not found");
-                                    }
-                                },
-                            ),
-                        ))
-                    } else {
-                        info!("early wake");
-                        // early wake
-                        ctx.notify_later(msg, deadline.duration_since(Instant::now()));
-                        AtomicResponse::new(Box::pin(ready(())))
-                    }
-                }
-                State::Uninit => {
-                    info!("init");
+                State::DelayedEstablish(deadline)
+                    if Instant::now() >= *deadline | State::Uninit =>
+                {
+                    info!("establish");
+                    // deadline reached (or uninit), may retry
                     let factory = msg.0.clone();
                     AtomicResponse::new(Box::pin(
                         async move { factory.build().await }.into_actor(self).map(
@@ -246,6 +213,12 @@ impl Handler<Wake> for CollectorActor {
                             },
                         ),
                     ))
+                }
+                State::DelayedEstablish(_) => {
+                    info!("early wake");
+                    // early wake
+                    ctx.notify_later(msg, deadline.duration_since(Instant::now()));
+                    AtomicResponse::new(Box::pin(ready(())))
                 }
             }
         } else {
