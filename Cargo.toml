@@ -17,6 +17,7 @@ path = "src/main.rs"
 actix = "0.12"
 actix-web = "4.0.0-beta.9"
 anyhow = "1.0"
+arraydeque = "0.4"
 async-trait = "0.1"
 bililive = { git = "https://github.com/PhotonQuantum/bililive-rs" }
 clap = "3.0.0-beta.4"

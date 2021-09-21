@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Deref};
@@ -9,6 +9,7 @@ use actix::fut::ready;
 use actix::{
     Actor, ActorFutureExt, AsyncContext, AtomicResponse, Handler, Message, Recipient, WrapFuture,
 };
+use arraydeque::{ArrayDeque, Wrapping};
 use async_trait::async_trait;
 use serde::Serialize;
 use tracing::{error, info};
@@ -90,7 +91,7 @@ impl Default for State {
 #[derive(Debug, Default)]
 struct Context {
     state: State,
-    queue: VecDeque<Publish>,
+    queue: ArrayDeque<[Publish; 1024], Wrapping>,
 }
 
 pub struct CollectorActor {
