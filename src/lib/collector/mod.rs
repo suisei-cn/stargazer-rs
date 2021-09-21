@@ -139,10 +139,23 @@ impl Handler<Wake> for CollectorActor {
     type Result = AtomicResponse<Self, ()>;
 
     fn handle(&mut self, msg: Wake, ctx: &mut Self::Context) -> Self::Result {
+        enum Branch<'a> {
+            Send(&'a mut Recipient<Publish>),
+            EstablishConnection,
+            EarlyWake(Instant),
+        }
         info!("waking");
         if let Some(collector_ctx) = self.collectors.get_mut(&msg.0) {
-            match &mut collector_ctx.state {
-                State::Available(collector) => {
+            let branch = match &mut collector_ctx.state {
+                State::Available(recipient) => Branch::Send(recipient),
+                State::DelayedEstablish(deadline) if Instant::now() >= *deadline => {
+                    Branch::EstablishConnection
+                }
+                State::DelayedEstablish(deadline) => Branch::EarlyWake(*deadline),
+                State::Uninit => Branch::EstablishConnection,
+            };
+            match branch {
+                Branch::Send(collector) => {
                     info!("collector available");
                     let event = collector_ctx.queue.pop_front();
                     if let Some(event) = event {
@@ -182,9 +195,7 @@ impl Handler<Wake> for CollectorActor {
                         AtomicResponse::new(Box::pin(ready(())))
                     }
                 }
-                State::DelayedEstablish(deadline)
-                    if Instant::now() >= *deadline | State::Uninit =>
-                {
+                Branch::EstablishConnection => {
                     info!("establish");
                     // deadline reached (or uninit), may retry
                     let factory = msg.0.clone();
@@ -214,7 +225,7 @@ impl Handler<Wake> for CollectorActor {
                         ),
                     ))
                 }
-                State::DelayedEstablish(_) => {
+                Branch::EarlyWake(deadline) => {
                     info!("early wake");
                     // early wake
                     ctx.notify_later(msg, deadline.duration_since(Instant::now()));
