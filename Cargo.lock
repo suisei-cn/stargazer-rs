@@ -401,7 +401,7 @@ checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 [[package]]
 name = "bililive"
 version = "0.1.0"
-source = "git+https://github.com/PhotonQuantum/bililive-rs#a5f6a0ef5052f59a2a10f0deae4d9e0578ce9a68"
+source = "git+https://github.com/PhotonQuantum/bililive-rs#621f3830bdfb435cd186fbf8e8f2c8ff213fc260"
 dependencies = [
  "async-tungstenite",
  "flate2",
