@@ -56,7 +56,7 @@ mod arb_handler {
 mod killer {
     use std::time::Duration;
 
-    use actix::{AsyncContext, System, SystemService};
+    use actix::{System, SystemService};
     use tokio::sync::mpsc::unbounded_channel;
     use tokio::time::{sleep, timeout};
 
@@ -76,7 +76,7 @@ mod killer {
                 actix::spawn(async move {
                     sleep(Duration::from_millis(100)).await;
                     // Killer failed to reap this system, notify main thread
-                    tx.send(());
+                    tx.send(()).unwrap();
                     System::current().stop(); // cleanup
                 });
 
