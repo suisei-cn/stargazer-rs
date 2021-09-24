@@ -31,7 +31,7 @@ impl Handler<Publish> for DebugCollector {
 
     fn handle(&mut self, msg: Publish, _ctx: &mut Self::Context) -> Self::Result {
         let output = serde_json::to_string(&*msg.data).unwrap();
-        info_span!("debug").in_scope(|| info!("collected: {}", output));
+        info_span!("debug").in_scope(|| info!("collected: [{}] {}", msg.topic, output));
         true
     }
 }
