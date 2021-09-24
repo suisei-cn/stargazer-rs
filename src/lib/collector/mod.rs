@@ -21,6 +21,9 @@ use crate::ArbiterContext;
 pub mod amqp;
 pub mod debug;
 
+#[cfg(test)]
+mod tests;
+
 fn span() -> Span {
     let arb_id = ArbiterContext::with(ArbiterContext::arbiter_id);
     info_span!("collector", arb=?arb_id)

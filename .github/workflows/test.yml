@@ -42,6 +42,13 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    env:
+      TEST_AMQP_URI: http://rmq:5672
+    services:
+      rmq:
+        image: rabbitmq:3
+        ports:
+          - 5672:5672
     steps:
       - uses: actions/checkout@v2
         name: Checkout 🛎️
