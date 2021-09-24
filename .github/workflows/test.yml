@@ -15,19 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         name: Checkout 🛎️
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-stable-${{ hashFiles('**/Cargo.lock') }}-lint
       - uses: actions-rs/toolchain@v1
         name: Setup Cargo Toolchain 🛎️
         with:
           components: rustfmt, clippy
           toolchain: stable
           default: true
+      - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         name: Check Code Format 🔧
         with:
@@ -52,19 +46,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         name: Checkout 🛎️
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-stable-${{ hashFiles('**/Cargo.lock') }}-test
       - uses: actions-rs/toolchain@v1
         name: Setup Cargo Toolchain 🛎️
         with:
           profile: minimal
           toolchain: stable
           default: true
+      - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         name: Running Tests 🚀
         with:
