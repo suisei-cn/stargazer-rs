@@ -50,9 +50,9 @@ impl Publish {
     ///
     /// # Panics
     /// Panics when given `data` can't be serialized into json.
-    pub fn new<T: 'static + Serialize + Send + Sync>(topic: String, data: T) -> Self {
+    pub fn new<T: 'static + Serialize + Send + Sync>(topic: &str, data: T) -> Self {
         Self {
-            topic,
+            topic: topic.to_string(),
             data: Arc::new(data),
         }
     }

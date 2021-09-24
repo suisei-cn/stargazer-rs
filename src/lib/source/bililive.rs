@@ -59,12 +59,9 @@ impl<T: 'static + Serialize + Send + Sync> Handler<ToCollector<T>> for BililiveA
                     let holding_ownership = res.unwrap_or(false);
                     if holding_ownership {
                         ArbiterContext::with(|ctx| {
-                            ctx.send(
-                                CollectorTarget,
-                                Publish::new(String::from("bililive"), msg.0),
-                            )
-                            .unwrap()
-                            .immediately();
+                            ctx.send(CollectorTarget, Publish::new("bililive", msg.0))
+                                .unwrap()
+                                .immediately();
                         });
                     } else {
                         warn!("unable to renew ts, trying to stop");

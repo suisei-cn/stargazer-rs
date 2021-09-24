@@ -44,7 +44,7 @@ async fn must_debug_collector() {
     };
     assert!(
         collector
-            .send(Publish::new(String::from("blabla"), msg.clone()))
+            .send(Publish::new("blabla", msg.clone()))
             .await
             .expect("mailbox error"),
         "unable to publish event"
@@ -164,7 +164,7 @@ async fn must_amqp_publish(uri: &'static str) {
     };
     assert!(
         collector
-            .send(Publish::new(String::from("blabla"), msg.clone()))
+            .send(Publish::new("blabla", msg.clone()))
             .await
             .expect("mailbox error"),
         "unable to publish event"
