@@ -47,7 +47,7 @@ impl_tick_handler!(BililiveActor);
 #[rtype("()")]
 struct ToCollector<T: Serialize>(T);
 
-impl<T: 'static + Serialize> Handler<ToCollector<T>> for BililiveActor {
+impl<T: 'static + Serialize + Send + Sync> Handler<ToCollector<T>> for BililiveActor {
     type Result = ResponseActFuture<Self, ()>;
 
     fn handle(&mut self, msg: ToCollector<T>, ctx: &mut Self::Context) -> Self::Result {

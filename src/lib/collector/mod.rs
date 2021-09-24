@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Deref};
 use std::rc::Rc;
@@ -26,11 +26,20 @@ fn span() -> Span {
     info_span!("collector", arb=?arb_id)
 }
 
-#[derive(Debug, Clone, Message)]
+#[derive(Clone, Message)]
 #[rtype("bool")]
 pub struct Publish {
     topic: String,
-    data: Arc<serde_json::Value>,
+    data: Arc<dyn erased_serde::Serialize + Send + Sync>,
+}
+
+impl Debug for Publish {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Publish")
+            .field("topic", &self.topic)
+            .field("data", &"...")
+            .finish()
+    }
 }
 
 impl Publish {
@@ -38,10 +47,10 @@ impl Publish {
     ///
     /// # Panics
     /// Panics when given `data` can't be serialized into json.
-    pub fn new<T: Serialize>(topic: String, data: T) -> Self {
+    pub fn new<T: 'static + Serialize + Send + Sync>(topic: String, data: T) -> Self {
         Self {
             topic,
-            data: Arc::new(serde_json::to_value(data).unwrap()),
+            data: Arc::new(data),
         }
     }
 }
