@@ -5,7 +5,7 @@ use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Context, Handler, Message,
     ResponseActFuture, StreamHandler, WrapFuture,
 };
-use bililive::tokio::connect_with_retry;
+use bililive::connect::tokio::connect_with_retry;
 use bililive::{BililiveError, ConfigBuilder, Packet, RetryConfig};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, info_span, warn, Span};
