@@ -17,6 +17,7 @@ pub type ScheduleConfig = Schedule;
 pub type HTTPConfig = HTTP;
 pub type MongoDBConfig = MongoDB;
 pub type AMQPConfig = AMQP;
+pub type TwitterConfig = Twitter;
 
 /// Contains all configuration to run the application.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
@@ -25,6 +26,7 @@ pub struct Config {
     schedule: Schedule,
     mongodb: MongoDB,
     collector: Collector,
+    source: Source,
 }
 
 impl Config {
@@ -39,6 +41,9 @@ impl Config {
     }
     pub const fn collector(&self) -> &Collector {
         &self.collector
+    }
+    pub const fn source(&self) -> &Source {
+        &self.source
     }
 }
 
@@ -125,6 +130,40 @@ impl Collector {
     }
     pub const fn debug(&self) -> DebugCollector {
         self.debug
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum Twitter {
+    Enabled(TwitterInner),
+    Disabled,
+}
+
+impl Default for Twitter {
+    fn default() -> Self {
+        Self::Disabled
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
+pub struct TwitterInner {
+    token: String,
+}
+
+impl TwitterInner {
+    pub fn token(&self) -> &str {
+        &self.token
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
+pub struct Source {
+    twitter: Twitter,
+}
+
+impl Source {
+    pub fn twitter(&self) -> &Twitter {
+        &self.twitter
     }
 }
 
@@ -322,6 +361,64 @@ impl<'de> Deserialize<'de> for AMQP {
                     .map(Deserialize::deserialize)?
                     .map_err(de::Error::custom)?,
             }
+        } else {
+            Self::Disabled
+        })
+    }
+}
+
+impl Serialize for Twitter {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        #[derive(Serialize)]
+        #[serde(untagged)]
+        enum Body {
+            Disabled,
+            Enabled(TwitterInner),
+        }
+        #[derive(Serialize)]
+        struct Tagged {
+            enabled: bool,
+            #[serde(flatten)]
+            body: Body,
+        }
+        match self {
+            Twitter::Disabled => Tagged {
+                enabled: false,
+                body: Body::Disabled,
+            },
+            Twitter::Enabled(inner) => Tagged {
+                enabled: true,
+                body: Body::Enabled(inner.clone()),
+            },
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Twitter {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = serde_json::Map::deserialize(deserializer)?;
+
+        let enabled = value
+            .get("enabled")
+            .ok_or_else(|| de::Error::missing_field("enabled"))
+            .map(Deserialize::deserialize)?
+            .map_err(de::Error::custom)?;
+
+        Ok(if enabled {
+            Self::Enabled(TwitterInner {
+                token: value
+                    .get("token")
+                    .ok_or_else(|| de::Error::missing_field("token"))
+                    .map(Deserialize::deserialize)?
+                    .map_err(de::Error::custom)?,
+            })
         } else {
             Self::Disabled
         })

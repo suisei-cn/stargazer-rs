@@ -11,6 +11,9 @@ max_interval = "1m"
 uri = "mongodb://localhost"
 database = "stargazer"
 
+[source.twitter]
+enabled = false
+
 [collector.amqp]
 enabled = true
 uri = "amqp://127.0.0.1"
