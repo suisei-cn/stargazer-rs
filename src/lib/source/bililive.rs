@@ -2,14 +2,12 @@ use std::fmt::Debug;
 
 use actix::fut::ready;
 use actix::{
-    Actor, ActorContext, ActorFutureExt, AsyncContext, Context, Handler, Message,
-    ResponseActFuture, StreamHandler, WrapFuture,
+    Actor, ActorContext, AsyncContext, Context, Handler, Message, ResponseActFuture, StreamHandler,
 };
 use bililive::connect::tokio::connect_with_retry;
 use bililive::{BililiveError, ConfigBuilder, Packet, RetryConfig};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, info_span, warn, Span};
-use tracing_actix::ActorInstrument;
 
 use crate::collector::{CollectorTarget, Publish};
 use crate::db::{Collection, Document};
@@ -18,7 +16,7 @@ use crate::scheduler::{Task, TaskInfo, Tick, TickOrStop};
 use crate::utils::Scheduler;
 use crate::{ArbiterContext, ScheduleConfig};
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct BililiveEntry {
     uid: u64,
 }

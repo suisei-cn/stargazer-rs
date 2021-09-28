@@ -69,6 +69,12 @@ macro_rules! impl_task_field_getter {
 #[macro_export]
 macro_rules! impl_tick_handler {
     ($Self: ident) => {
+        #[allow(unused_imports)]
+        use actix::ActorFutureExt as _ActorFutureExt;
+        #[allow(unused_imports)]
+        use actix::WrapFuture as _WrapFuture;
+        #[allow(unused_imports)]
+        use tracing_actix::ActorInstrument as _ActorInstrument;
         impl actix::Handler<$crate::scheduler::Tick> for $Self {
             type Result = actix::ResponseActFuture<Self, bool>;
 
