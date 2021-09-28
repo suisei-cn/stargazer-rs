@@ -1,20 +1,17 @@
 use std::fmt::Debug;
 
 use actix::fut::ready;
-use actix::{
-    Actor, ActorContext, AsyncContext, Context, Handler, Message, ResponseActFuture, StreamHandler,
-};
+use actix::{Actor, ActorContext, AsyncContext, Context, StreamHandler};
 use bililive::connect::tokio::connect_with_retry;
 use bililive::{BililiveError, ConfigBuilder, Packet, RetryConfig};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, info_span, warn, Span};
 
-use crate::collector::{CollectorTarget, Publish};
 use crate::db::{Collection, Document};
-use crate::request::RequestTrait;
-use crate::scheduler::{Task, TaskInfo, Tick, TickOrStop};
+use crate::scheduler::{Task, TaskInfo, TickOrStop};
+use crate::source::ToCollector;
 use crate::utils::Scheduler;
-use crate::{ArbiterContext, ScheduleConfig};
+use crate::ScheduleConfig;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct BililiveEntry {
@@ -40,36 +37,7 @@ impl_task_field_getter!(BililiveActor, info, scheduler);
 impl_stop_on_panic!(BililiveActor);
 impl_message_target!(pub BililiveTarget, BililiveActor);
 impl_tick_handler!(BililiveActor);
-
-#[derive(Debug, Clone, Message)]
-#[rtype("()")]
-struct ToCollector<T: Serialize>(T);
-
-impl<T: 'static + Serialize + Send + Sync> Handler<ToCollector<T>> for BililiveActor {
-    type Result = ResponseActFuture<Self, ()>;
-
-    fn handle(&mut self, msg: ToCollector<T>, ctx: &mut Self::Context) -> Self::Result {
-        Box::pin(
-            ctx.address()
-                .send(Tick)
-                .into_actor(self)
-                .map(move |res, _act, ctx| {
-                    let holding_ownership = res.unwrap_or(false);
-                    if holding_ownership {
-                        ArbiterContext::with(|ctx| {
-                            ctx.send(CollectorTarget, Publish::new("bililive", msg.0))
-                                .unwrap()
-                                .immediately();
-                        });
-                    } else {
-                        warn!("unable to renew ts, trying to stop");
-                        ctx.stop();
-                    };
-                })
-                .actor_instrument(self.span()),
-        )
-    }
-}
+impl_to_collector_handler!(BililiveActor);
 
 impl StreamHandler<Result<Packet, BililiveError>> for BililiveActor {
     fn handle(&mut self, item: Result<Packet, BililiveError>, ctx: &mut Self::Context) {
@@ -78,7 +46,7 @@ impl StreamHandler<Result<Packet, BililiveError>> for BililiveActor {
             Ok(msg) => {
                 if let Ok(msg) = msg.json::<serde_json::Value>() {
                     debug!("publishing event to collector");
-                    ctx.notify(ToCollector(msg));
+                    ctx.notify(ToCollector::new("bililive", msg));
                 }
             }
             Err(e) => {

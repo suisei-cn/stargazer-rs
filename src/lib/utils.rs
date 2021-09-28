@@ -112,6 +112,47 @@ macro_rules! impl_tick_handler {
     };
 }
 
+#[macro_export]
+macro_rules! impl_to_collector_handler {
+    ($Self: ident) => {
+        impl<T: 'static + serde::Serialize + Send + Sync>
+            actix::Handler<crate::source::ToCollector<T>> for $Self
+        {
+            type Result = actix::ResponseActFuture<Self, ()>;
+
+            fn handle(
+                &mut self,
+                msg: crate::source::ToCollector<T>,
+                ctx: &mut Self::Context,
+            ) -> Self::Result {
+                use crate::request::RequestTrait;
+                Box::pin(
+                    ctx.address()
+                        .send(crate::scheduler::Tick)
+                        .into_actor(self)
+                        .map(move |res, _act, ctx| {
+                            let holding_ownership = res.unwrap_or(false);
+                            if holding_ownership {
+                                crate::context::ArbiterContext::with(|ctx| {
+                                    ctx.send(
+                                        crate::collector::CollectorTarget,
+                                        crate::collector::Publish::new(&*msg.topic, msg.body),
+                                    )
+                                    .unwrap()
+                                    .immediately();
+                                });
+                            } else {
+                                tracing::warn!("unable to renew ts, trying to stop");
+                                ctx.stop();
+                            };
+                        })
+                        .actor_instrument(self.span()),
+                )
+            }
+        }
+    };
+}
+
 #[allow(clippy::cast_possible_truncation)]
 pub fn timestamp(t: SystemTime) -> i64 {
     t.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64
