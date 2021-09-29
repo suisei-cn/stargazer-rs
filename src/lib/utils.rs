@@ -67,52 +67,6 @@ macro_rules! impl_task_field_getter {
 }
 
 #[macro_export]
-macro_rules! impl_tick_handler {
-    ($Self: ident) => {
-        #[allow(unused_imports)]
-        use actix::ActorFutureExt as _ActorFutureExt;
-        #[allow(unused_imports)]
-        use actix::WrapFuture as _WrapFuture;
-        #[allow(unused_imports)]
-        use tracing_actix::ActorInstrument as _ActorInstrument;
-        impl actix::Handler<$crate::scheduler::Tick> for $Self {
-            type Result = actix::ResponseActFuture<Self, bool>;
-
-            fn handle(
-                &mut self,
-                _msg: $crate::scheduler::Tick,
-                _ctx: &mut Self::Context,
-            ) -> Self::Result {
-                $crate::scheduler::handle_tick(self)
-            }
-        }
-        impl actix::Handler<$crate::scheduler::TickOrStop> for $Self {
-            type Result = actix::ResponseActFuture<Self, ()>;
-
-            fn handle(
-                &mut self,
-                _msg: $crate::scheduler::TickOrStop,
-                ctx: &mut Self::Context,
-            ) -> Self::Result {
-                use actix::AsyncContext;
-                Box::pin(
-                    ctx.address()
-                        .send($crate::scheduler::Tick)
-                        .into_actor(self)
-                        .map(|res, _, ctx| {
-                            if !res.unwrap_or(false) {
-                                tracing::warn!("unable to renew ts, trying to stop");
-                                ctx.stop()
-                            }
-                        })
-                        .actor_instrument(self.span()),
-                )
-            }
-        }
-    };
-}
-
-#[macro_export]
 macro_rules! impl_to_collector_handler {
     ($Self: ident) => {
         impl<T: 'static + serde::Serialize + Send + Sync>
@@ -123,15 +77,24 @@ macro_rules! impl_to_collector_handler {
             fn handle(
                 &mut self,
                 msg: crate::source::ToCollector<T>,
-                ctx: &mut Self::Context,
+                _ctx: &mut Self::Context,
             ) -> Self::Result {
+                use actix::ActorFutureExt;
+                use actix::WrapFuture;
+                use tracing_actix::ActorInstrument;
+
                 use crate::request::RequestTrait;
+                use crate::scheduler::InfoGetter;
+                use crate::scheduler::SchedulerGetter;
+
                 Box::pin(
-                    ctx.address()
-                        .send(crate::scheduler::Tick)
+                    self.get_scheduler()
+                        .send(crate::scheduler::messages::UpdateEntry::empty_payload(
+                            self.get_info(),
+                        ))
                         .into_actor(self)
                         .map(move |res, _act, ctx| {
-                            let holding_ownership = res.unwrap_or(false);
+                            let holding_ownership = res.unwrap_or(Ok(false)).unwrap_or(false);
                             if holding_ownership {
                                 crate::context::ArbiterContext::with(|ctx| {
                                     ctx.send(

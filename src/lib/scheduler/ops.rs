@@ -8,7 +8,7 @@ use mongodb::error::Result as DBResult;
 use mongodb::options::{FindOneAndUpdateOptions, ReturnDocument};
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tracing::info;
 use uuid::Uuid;
 
@@ -18,26 +18,34 @@ use crate::utils::timestamp;
 use super::models::{SchedulerMeta, TaskInfo};
 
 #[derive(Debug, Clone)]
-pub struct UpdateTSOp {
-    task_info: TaskInfo,
+pub struct UpdateEntryOp<T> {
+    info: TaskInfo,
+    body: Option<T>,
 }
 
-impl UpdateTSOp {
-    pub const fn new(task_info: TaskInfo) -> Self {
-        Self { task_info }
+impl<T> UpdateEntryOp<T> {
+    pub fn new(info: TaskInfo, body: Option<T>) -> Self {
+        UpdateEntryOp { info, body }
     }
 }
 
 #[async_trait]
-impl DBOperation for UpdateTSOp {
+impl<T: Serialize + Sync> DBOperation for UpdateEntryOp<T> {
     type Result = bool;
     type Item = Document;
 
     async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
+        let mut body = if let Some(body) = &self.body {
+            bson::to_document(body)?
+        } else {
+            Document::new()
+        };
+        body.insert("timestamp", timestamp(SystemTime::now()));
+
         Ok(collection
             .update_one(
-                doc! {"_id": self.task_info.doc_id(), "uuid": self.task_info.uuid().to_string()},
-                doc! {"$set": {"timestamp": timestamp(SystemTime::now())}},
+                doc! {"_id": self.info.doc_id(), "uuid": self.info.uuid().to_string()},
+                doc! {"$set": body},
                 None,
             )
             .await?

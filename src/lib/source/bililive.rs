@@ -1,14 +1,18 @@
 use std::fmt::Debug;
 
 use actix::fut::ready;
-use actix::{Actor, ActorContext, AsyncContext, Context, StreamHandler};
+use actix::{
+    Actor, ActorContext, ActorFutureExt, AsyncContext, Context, StreamHandler, WrapFuture,
+};
 use bililive::connect::tokio::connect_with_retry;
 use bililive::{BililiveError, ConfigBuilder, Packet, RetryConfig};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, info_span, warn, Span};
+use tracing_actix::ActorInstrument;
 
 use crate::db::{Collection, Document};
-use crate::scheduler::{Task, TaskInfo, TickOrStop};
+use crate::scheduler::messages::UpdateEntry;
+use crate::scheduler::{InfoGetter, SchedulerGetter, Task, TaskInfo};
 use crate::source::ToCollector;
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
@@ -36,7 +40,6 @@ pub struct BililiveActor {
 impl_task_field_getter!(BililiveActor, info, scheduler);
 impl_stop_on_panic!(BililiveActor);
 impl_message_target!(pub BililiveTarget, BililiveActor);
-impl_tick_handler!(BililiveActor);
 impl_to_collector_handler!(BililiveActor);
 
 impl StreamHandler<Result<Packet, BililiveError>> for BililiveActor {
@@ -67,8 +70,19 @@ impl Actor for BililiveActor {
 
         // update timestamp
         // TODO may not wake on time, investigation needed
-        ctx.run_interval(self.schedule_config.max_interval() / 2, |_, ctx| {
-            ctx.notify(TickOrStop);
+        ctx.run_interval(self.schedule_config.max_interval() / 2, |act, ctx| {
+            ctx.spawn(
+                act.get_scheduler()
+                    .send(UpdateEntry::empty_payload(act.get_info()))
+                    .into_actor(act)
+                    .map(|res, _act, ctx| {
+                        if !res.unwrap_or(Ok(false)).unwrap_or(false) {
+                            tracing::warn!("unable to renew ts, trying to stop");
+                            ctx.stop()
+                        }
+                    }),
+            )
+            .actor_instrument(act.span());
         });
 
         let uid = self.uid;

@@ -16,9 +16,27 @@ impl<T: Actor> Message for TrySchedule<T> {
 
 /// Update the timestamp.
 /// Returns `false` if the resource bound to this worker is replaced by another worker or deleted
-#[derive(Debug, Copy, Clone, Message)]
+#[derive(Debug, Clone, Message)]
 #[rtype("DBResult<bool>")]
-pub struct UpdateTimestamp(pub TaskInfo);
+pub struct UpdateEntry<T> {
+    pub info: TaskInfo,
+    pub body: Option<T>,
+}
+
+impl<T> UpdateEntry<T> {
+    pub fn new(info: TaskInfo, body: impl Into<Option<T>>) -> Self {
+        UpdateEntry {
+            info,
+            body: body.into(),
+        }
+    }
+}
+
+impl UpdateEntry<()> {
+    pub fn empty_payload(info: TaskInfo) -> Self {
+        UpdateEntry { info, body: None }
+    }
+}
 
 #[derive(Debug, Copy, Clone, Message)]
 #[rtype("uuid::Uuid")]

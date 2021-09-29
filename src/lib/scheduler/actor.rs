@@ -2,12 +2,13 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use actix::{
     Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, ResponseActFuture, ResponseFuture,
     WrapFuture,
 };
+use serde::Serialize;
 use tracing::{info, info_span, warn};
 use tracing_actix::ActorInstrument;
 use typed_builder::TypedBuilder;
@@ -16,8 +17,8 @@ use uuid::Uuid;
 use crate::common::ResponseWrapper;
 use crate::config::ScheduleConfig;
 use crate::db::{Collection, DBOperation, DBResult, Document};
-use crate::scheduler::messages::UpdateTimestamp;
-use crate::scheduler::ops::UpdateTSOp;
+use crate::scheduler::messages::UpdateEntry;
+use crate::scheduler::ops::UpdateEntryOp;
 
 use super::messages::{ActorsIter, GetId, TriggerGC, TrySchedule};
 use super::models::SchedulerMeta;
@@ -57,8 +58,8 @@ where
     T: Task,
 {
     pub(crate) collection: Collection<Document>,
-    #[builder(setter(transform = | f: impl Fn() -> T::Ctor + Send + Sync + 'static | Rc::new(f) as Rc < dyn Fn() -> T::Ctor + Send + Sync >))]
-    pub(crate) ctor_builder: Rc<dyn Fn() -> T::Ctor + Send + Sync>,
+    #[builder(setter(transform = | f: impl Fn() -> T::Ctor + Send + Sync + 'static | Arc::new(f) as Arc < dyn Fn() -> T::Ctor + Send + Sync >))]
+    pub(crate) ctor_builder: Arc<dyn Fn() -> T::Ctor + Send + Sync>,
     pub(crate) config: ScheduleConfig,
     #[builder(default, setter(skip))]
     pub(crate) ctx: ScheduleContext<T>,
@@ -133,15 +134,15 @@ where
     }
 }
 
-impl<T> Handler<UpdateTimestamp> for ScheduleActor<T>
+impl<T, U: 'static + Serialize + Sync> Handler<UpdateEntry<U>> for ScheduleActor<T>
 where
     T: 'static + Task + Actor<Context = Context<T>> + Unpin,
 {
     type Result = ResponseFuture<DBResult<bool>>;
 
-    fn handle(&mut self, msg: UpdateTimestamp, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: UpdateEntry<U>, _ctx: &mut Self::Context) -> Self::Result {
         let collection = self.collection.clone();
-        let op = UpdateTSOp::new(msg.0);
+        let op = UpdateEntryOp::new(msg.info, msg.body);
         Box::pin(async move { op.execute(&collection).await })
     }
 }
