@@ -1,15 +1,19 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use actix::Actor;
+use actix_web::web;
+use actix_web::web::Data;
 use clap::{AppSettings, Clap};
 
 use stargazer_lib::collector::amqp::AMQPFactory;
 use stargazer_lib::collector::debug::DebugCollectorFactory;
 use stargazer_lib::collector::CollectorActor;
-use stargazer_lib::db::{connect_db, Collection, Document};
+use stargazer_lib::db::{connect_db, Coll, Collection, Document};
 use stargazer_lib::scheduler::ScheduleActor;
-use stargazer_lib::source::bililive::BililiveActor;
-use stargazer_lib::{ArbiterContext, Config, ScheduleConfig, Server, AMQP};
+use stargazer_lib::source::bililive::{BililiveActor, BililiveColl};
+use stargazer_lib::source::twitter::{TwitterActor, TwitterColl, TwitterCtor};
+use stargazer_lib::{ArbiterContext, Config, ScheduleConfig, Server, TwitterConfig, AMQP};
 
 #[derive(Clap)]
 #[clap(
@@ -30,22 +34,52 @@ async fn main() {
     let opts = Opts::parse();
     let config = Config::new(opts.config.as_deref()).unwrap();
     let collector_config = config.collector().clone();
+    let sched_config = ScheduleConfig::default();
+
+    let source_config = config.source();
+    let twitter_config = source_config.twitter();
 
     let db = connect_db(config.mongodb().uri(), config.mongodb().database())
         .await
         .expect("unable to connect to db");
-    let coll: Collection<Document> = db.collection("bililive");
+    let coll_bililive: Collection<Document> = db.collection("bililive");
+    let coll_twitter: Collection<Document> = db.collection("twitter");
+
+    let bililive_actor: ScheduleActor<BililiveActor> = ScheduleActor::builder()
+        .collection(coll_bililive.clone())
+        .ctor_builder(ScheduleConfig::default)
+        .config(sched_config)
+        .build();
+
+    let twitter_actor: Option<ScheduleActor<TwitterActor>> =
+        if let TwitterConfig::Enabled { token } = twitter_config {
+            let token = token.clone();
+            Some(
+                ScheduleActor::builder()
+                    .collection(coll_twitter.clone())
+                    .ctor_builder(move || TwitterCtor::new(sched_config, &*token))
+                    .config(sched_config)
+                    .build(),
+            )
+        } else {
+            None
+        };
+
+    let arc_coll_bililive: Arc<Coll<BililiveColl>> = Arc::new(Coll::new(coll_bililive));
+    let arc_coll_twitter: Arc<Coll<TwitterColl>> = Arc::new(Coll::new(coll_twitter));
 
     Server::new(move |instance_id| {
         let collector_config = collector_config.clone();
         let ctx = ArbiterContext::new(instance_id);
 
-        let bililive_actor: ScheduleActor<BililiveActor> = ScheduleActor::builder()
-            .collection(coll.clone())
-            .ctor_builder(ScheduleConfig::default)
-            .config(ScheduleConfig::default())
-            .build();
-        let bililive_addr = bililive_actor.start();
+        let bililive_addr = bililive_actor.clone().start();
+
+        let twitter_addr = twitter_actor.clone().map(|act| act.start());
+        let ctx = if let Some(addr) = twitter_addr {
+            ctx.register_addr(addr)
+        } else {
+            ctx
+        };
 
         let mut collector_factories = Vec::new();
         if let AMQP::Enabled { uri, exchange } = collector_config.amqp() {
@@ -57,11 +91,18 @@ async fn main() {
         let collector_actor = CollectorActor::new(collector_factories);
         let collector_addr = collector_actor.start();
 
+        let arc_coll_bililive = arc_coll_bililive.clone();
+        let arc_coll_twitter = arc_coll_twitter.clone();
         // register actor addrs
         (
             ctx.register_addr(bililive_addr)
                 .register_addr(collector_addr),
-            |_| {},
+            move |cfg| {
+                cfg.app_data(Data::from(arc_coll_bililive))
+                    .app_data(Data::from(arc_coll_twitter))
+                    .service(web::scope("/bililive").service(stargazer_lib::source::bililive::set))
+                    .service(web::scope("/twitter").service(stargazer_lib::source::twitter::set));
+            },
         )
     })
     .run(config.http().into())

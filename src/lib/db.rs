@@ -1,8 +1,33 @@
+use std::marker::PhantomData;
+use std::ops::Deref;
+
 use async_trait::async_trait;
 pub use mongodb::bson::Document;
 pub use mongodb::error::Result as DBResult;
 pub use mongodb::Collection;
 use mongodb::{Client, Database};
+
+pub struct Coll<T> {
+    coll: Collection<Document>,
+    _marker: PhantomData<T>,
+}
+
+impl<T> Coll<T> {
+    pub fn new(coll: Collection<Document>) -> Self {
+        Coll {
+            coll,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T> Deref for Coll<T> {
+    type Target = Collection<Document>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.coll
+    }
+}
 
 #[async_trait]
 pub trait DBOperation {
