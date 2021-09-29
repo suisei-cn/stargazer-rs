@@ -175,7 +175,7 @@ pub struct TwitterCtor {
 
 impl TwitterCtor {
     pub fn new(schedule_config: ScheduleConfig, token: &str) -> Self {
-        TwitterCtor {
+        Self {
             schedule_config,
             token: token.to_string(),
         }

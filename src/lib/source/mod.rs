@@ -13,7 +13,7 @@ pub struct ToCollector<T: Serialize> {
 
 impl<T: Serialize> ToCollector<T> {
     pub fn new(topic: &str, body: T) -> Self {
-        ToCollector {
+        Self {
             topic: topic.to_string(),
             body,
         }

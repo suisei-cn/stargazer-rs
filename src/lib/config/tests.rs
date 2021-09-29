@@ -1,5 +1,6 @@
-use super::{Config, HTTP};
 use figment::Jail;
+
+use super::{Config, HTTP};
 
 #[test]
 fn must_load_specified() {

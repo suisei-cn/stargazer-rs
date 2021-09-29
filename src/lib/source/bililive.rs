@@ -80,7 +80,7 @@ impl Actor for BililiveActor {
                     .map(|res, _act, ctx| {
                         if !res.unwrap_or(Ok(false)).unwrap_or(false) {
                             warn!("unable to renew ts, trying to stop");
-                            ctx.stop()
+                            ctx.stop();
                         }
                     }),
             )

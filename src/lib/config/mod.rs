@@ -151,7 +151,7 @@ pub struct Source {
 }
 
 impl Source {
-    pub fn twitter(&self) -> &Twitter {
+    pub const fn twitter(&self) -> &Twitter {
         &self.twitter
     }
 }

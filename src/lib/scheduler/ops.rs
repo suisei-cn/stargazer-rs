@@ -24,8 +24,8 @@ pub struct UpdateEntryOp<T> {
 }
 
 impl<T> UpdateEntryOp<T> {
-    pub fn new(info: TaskInfo, body: Option<T>) -> Self {
-        UpdateEntryOp { info, body }
+    pub const fn new(info: TaskInfo, body: Option<T>) -> Self {
+        Self { info, body }
     }
 }
 

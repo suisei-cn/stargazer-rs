@@ -25,7 +25,7 @@ pub struct UpdateEntry<T> {
 
 impl<T> UpdateEntry<T> {
     pub fn new(info: TaskInfo, body: impl Into<Option<T>>) -> Self {
-        UpdateEntry {
+        Self {
             info,
             body: body.into(),
         }
@@ -33,8 +33,8 @@ impl<T> UpdateEntry<T> {
 }
 
 impl UpdateEntry<()> {
-    pub fn empty_payload(info: TaskInfo) -> Self {
-        UpdateEntry { info, body: None }
+    pub const fn empty_payload(info: TaskInfo) -> Self {
+        Self { info, body: None }
     }
 }
 

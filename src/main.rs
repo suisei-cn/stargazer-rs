@@ -74,7 +74,10 @@ async fn main() {
 
         let bililive_addr = bililive_actor.clone().start();
 
-        let twitter_addr = twitter_actor.clone().map(|act| act.start());
+        let twitter_addr = twitter_actor.clone().map(Actor::start);
+
+        // TODO blocked by edition 2021
+        #[allow(clippy::option_if_let_else)]
         let ctx = if let Some(addr) = twitter_addr {
             ctx.register_addr(addr)
         } else {
