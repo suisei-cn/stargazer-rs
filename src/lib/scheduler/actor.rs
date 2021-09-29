@@ -5,8 +5,8 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use actix::{
-    Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, ResponseActFuture, ResponseFuture,
-    WrapFuture,
+    Actor, ActorFutureExt, Addr, AsyncContext, AtomicResponse, Context, Handler, ResponseActFuture,
+    ResponseFuture, WrapFuture,
 };
 use serde::Serialize;
 use tracing::{info, info_span, warn};
@@ -138,12 +138,14 @@ impl<T, U: 'static + Serialize + Sync> Handler<UpdateEntry<U>> for ScheduleActor
 where
     T: 'static + Task + Actor<Context = Context<T>> + Unpin,
 {
-    type Result = ResponseFuture<DBResult<bool>>;
+    type Result = AtomicResponse<Self, DBResult<bool>>;
 
     fn handle(&mut self, msg: UpdateEntry<U>, _ctx: &mut Self::Context) -> Self::Result {
         let collection = self.collection.clone();
         let op = UpdateEntryOp::new(msg.info, msg.body);
-        Box::pin(async move { op.execute(&collection).await })
+        AtomicResponse::new(Box::pin(
+            async move { op.execute(&collection).await }.into_actor(self),
+        ))
     }
 }
 
