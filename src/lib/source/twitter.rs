@@ -1,13 +1,22 @@
-use actix::{Actor, ActorContext, AsyncContext, Context};
-use egg_mode::tweet::TimelineFuture;
+use actix::fut::ready;
+use actix::{
+    Actor, ActorContext, ActorFutureExt, AsyncContext, Context, ResponseActFuture, WrapFuture,
+};
+use actix_web::{get, web, Responder};
+use egg_mode::entities::MediaType;
+use egg_mode::error::Result;
 use egg_mode::user::UserID;
 use egg_mode::{tweet, Token};
+use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::Span;
-use tracing::{error, info, info_span};
+use tracing::{error, info, info_span, warn};
+use tracing_actix::ActorInstrument;
 
-use crate::db::{Collection, Document};
+use crate::db::{Coll, Collection, Document};
+use crate::scheduler::messages::UpdateEntry;
 use crate::scheduler::{Task, TaskInfo};
+use crate::source::ToCollector;
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
 
@@ -15,6 +24,19 @@ use crate::ScheduleConfig;
 pub struct TwitterEntry {
     uid: u64,
     since: Option<u64>,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+pub struct TwitterSince {
+    since: Option<u64>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+pub struct Tweet {
+    text: String,
+    photos: Vec<String>,
+    link: String,
+    is_rt: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -30,7 +52,6 @@ pub struct TwitterActor {
 impl_task_field_getter!(TwitterActor, info, scheduler);
 impl_stop_on_panic!(TwitterActor);
 impl_message_target!(pub TwitterTarget, TwitterActor);
-impl_tick_handler!(TwitterActor);
 impl_to_collector_handler!(TwitterActor);
 
 impl Actor for TwitterActor {
@@ -45,16 +66,33 @@ impl Actor for TwitterActor {
             let token = act.token.clone();
             let entry = act.entry;
             ctx.spawn(
-                fetch_tweets(&token, entry)
+                fetch_tweets(token, entry)
                     .into_actor(act)
-                    .map(|tweets, _, ctx| {
+                    .then(|tweets, act, ctx| -> ResponseActFuture<Self, _> {
                         match tweets {
-                            Ok((_, tweets)) => {
-                                // TODO ToCollector
-                                info!("{:?}", tweets);
+                            Ok((since, tweets)) => {
+                                if !tweets.is_empty() {
+                                    ctx.notify(ToCollector::new("twitter", tweets));
+                                }
+                                act.entry.since = since;
+                                Box::pin(
+                                    act.scheduler
+                                        .send(UpdateEntry::new(act.info, TwitterSince { since }))
+                                        .into_actor(act)
+                                        .map(|res, _, _| Some(res)),
+                                )
                             }
                             Err(e) => {
                                 error!("tweet fetch error: {:?}", e);
+                                ctx.stop();
+                                Box::pin(ready(None).into_actor(act))
+                            }
+                        }
+                    })
+                    .map(|res, _, ctx| {
+                        if let Some(res) = res {
+                            if !res.unwrap_or(Ok(false)).unwrap_or(false) {
+                                warn!("unable to renew ts, trying to stop");
                                 ctx.stop();
                             }
                         }
@@ -65,9 +103,36 @@ impl Actor for TwitterActor {
     }
 }
 
-fn fetch_tweets(token: &Token, entry: TwitterEntry) -> TimelineFuture {
-    let tl = tweet::user_timeline(UserID::ID(entry.uid), false, true, token);
-    tl.with_page_size(5).older(entry.since)
+async fn fetch_tweets(token: Token, entry: TwitterEntry) -> Result<(Option<u64>, Vec<Tweet>)> {
+    let tl = tweet::user_timeline(UserID::ID(entry.uid), false, true, &token);
+    let (_, tweets) = tl.with_page_size(5).older(entry.since).await?;
+
+    let new_since = tweets.first().map(|tweet| tweet.id).or(entry.since);
+
+    Ok((
+        new_since,
+        tweets
+            .response
+            .into_iter()
+            .map(|tweet| Tweet {
+                text: tweet.text,
+                photos: tweet
+                    .entities
+                    .media
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|medium| medium.media_type == MediaType::Photo)
+                    .map(|medium| medium.media_url_https)
+                    .collect(),
+                link: format!(
+                    "https://twitter.com/{}/status/{}",
+                    tweet.user.unwrap().screen_name,
+                    tweet.id
+                ),
+                is_rt: tweet.retweeted_status.is_some(),
+            })
+            .collect(),
+    ))
 }
 
 impl Task for TwitterActor {
@@ -115,4 +180,17 @@ impl TwitterCtor {
             token: token.to_string(),
         }
     }
+}
+
+pub struct TwitterColl;
+
+#[get("/set")]
+pub async fn set(
+    coll: web::Data<Coll<TwitterColl>>,
+    entry: web::Query<TwitterEntry>,
+) -> impl Responder {
+    coll.insert_one(&bson::to_document(&*entry).unwrap(), None)
+        .await
+        .unwrap();
+    "ok"
 }

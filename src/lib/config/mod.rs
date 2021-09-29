@@ -135,24 +135,13 @@ impl Collector {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Twitter {
-    Enabled(TwitterInner),
+    Enabled { token: String },
     Disabled,
 }
 
 impl Default for Twitter {
     fn default() -> Self {
         Self::Disabled
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
-pub struct TwitterInner {
-    token: String,
-}
-
-impl TwitterInner {
-    pub fn token(&self) -> &str {
-        &self.token
     }
 }
 
@@ -376,7 +365,7 @@ impl Serialize for Twitter {
         #[serde(untagged)]
         enum Body {
             Disabled,
-            Enabled(TwitterInner),
+            Enabled { token: String },
         }
         #[derive(Serialize)]
         struct Tagged {
@@ -389,9 +378,11 @@ impl Serialize for Twitter {
                 enabled: false,
                 body: Body::Disabled,
             },
-            Twitter::Enabled(inner) => Tagged {
+            Twitter::Enabled { token } => Tagged {
                 enabled: true,
-                body: Body::Enabled(inner.clone()),
+                body: Body::Enabled {
+                    token: token.clone(),
+                },
             },
         }
         .serialize(serializer)
@@ -412,13 +403,13 @@ impl<'de> Deserialize<'de> for Twitter {
             .map_err(de::Error::custom)?;
 
         Ok(if enabled {
-            Self::Enabled(TwitterInner {
+            Self::Enabled {
                 token: value
                     .get("token")
                     .ok_or_else(|| de::Error::missing_field("token"))
                     .map(Deserialize::deserialize)?
                     .map_err(de::Error::custom)?,
-            })
+            }
         } else {
             Self::Disabled
         })
