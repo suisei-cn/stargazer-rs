@@ -4,13 +4,15 @@ use actix::fut::ready;
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Context, StreamHandler, WrapFuture,
 };
+use actix_web::{get, web, Responder};
 use bililive::connect::tokio::connect_with_retry;
 use bililive::{BililiveError, ConfigBuilder, Packet, RetryConfig};
+use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, info_span, warn, Span};
 use tracing_actix::ActorInstrument;
 
-use crate::db::{Collection, Document};
+use crate::db::{Coll, Collection, Document};
 use crate::scheduler::messages::UpdateEntry;
 use crate::scheduler::{InfoGetter, SchedulerGetter, Task, TaskInfo};
 use crate::source::ToCollector;
@@ -77,7 +79,7 @@ impl Actor for BililiveActor {
                     .into_actor(act)
                     .map(|res, _act, ctx| {
                         if !res.unwrap_or(Ok(false)).unwrap_or(false) {
-                            tracing::warn!("unable to renew ts, trying to stop");
+                            warn!("unable to renew ts, trying to stop");
                             ctx.stop()
                         }
                     }),
@@ -145,4 +147,17 @@ impl Task for BililiveActor {
         let uid = self.uid;
         info_span!("bililive", ?task_id, uid)
     }
+}
+
+pub struct BililiveColl;
+
+#[get("/set")]
+pub async fn set(
+    coll: web::Data<Coll<BililiveColl>>,
+    entry: web::Query<BililiveEntry>,
+) -> impl Responder {
+    coll.insert_one(&bson::to_document(&*entry).unwrap(), None)
+        .await
+        .unwrap();
+    "ok"
 }
