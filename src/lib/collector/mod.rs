@@ -13,7 +13,7 @@ use actix::{
 use arraydeque::{ArrayDeque, Wrapping};
 use async_trait::async_trait;
 use serde::Serialize;
-use tracing::{debug, error, info, info_span, warn, Span};
+use tracing::{trace, debug, error, info, info_span, warn, Span};
 use tracing_actix::ActorInstrument;
 
 use crate::ArbiterContext;
@@ -173,7 +173,7 @@ impl Handler<Wake> for CollectorActor {
             EstablishConnection,
             EarlyWake(Instant),
         }
-        span().in_scope(|| debug!("waked"));
+        span().in_scope(|| trace!("waked"));
         if let Some(collector_ctx) = self.collectors.get_mut(&msg.0) {
             let branch = match &mut collector_ctx.state {
                 State::Available(recipient) => Branch::Send(recipient),
