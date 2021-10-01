@@ -400,9 +400,9 @@ checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
 name = "bililive"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9bbc6293412e3cad234440be828c570c2483af7756c1ed53263fe8de925f53b"
+checksum = "5d2d7f88f5029bacc3057ae04bfc78d4bcd0bcadd4fd6fd78ccd90fb4615d25c"
 dependencies = [
  "async-tungstenite",
  "flate2",
