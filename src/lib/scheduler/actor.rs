@@ -3,11 +3,13 @@ use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 
 use actix::{
-    Actor, ActorFutureExt, Addr, AsyncContext, AtomicResponse, Context, Handler, ResponseActFuture,
-    ResponseFuture, WrapFuture,
+    Actor, ActorFutureExt, Addr, AsyncContext, AtomicResponse, Context, Handler, ResponseFuture,
+    WrapFuture,
 };
+use rand::{thread_rng, Rng};
 use serde::Serialize;
 use tracing::{info, info_span, warn};
 use tracing_actix::ActorInstrument;
@@ -81,7 +83,7 @@ where
     T: 'static + Task + Actor<Context = Context<T>> + Unpin,
 {
     #[allow(clippy::type_complexity)]
-    type Result = ResponseActFuture<Self, DBResult<Option<(Uuid, Addr<T>)>>>;
+    type Result = AtomicResponse<Self, DBResult<Option<(Uuid, Addr<T>)>>>;
 
     fn handle(&mut self, _msg: TrySchedule<T>, ctx: &mut Self::Context) -> Self::Result {
         let collection = self.collection.clone();
@@ -93,7 +95,7 @@ where
 
         let scheduler_id = self.ctx.id;
 
-        Box::pin(
+        AtomicResponse::new(Box::pin(
             async move {
                 ScheduleOp::new(
                     ScheduleMode::Auto,
@@ -130,7 +132,7 @@ where
                 })
             })
             .actor_instrument(info_span!("scheduler", id=?scheduler_id)),
-        )
+        ))
     }
 }
 
@@ -203,7 +205,8 @@ where
     fn started(&mut self, ctx: &mut Self::Context) {
         // schedule task
         ctx.run_interval(self.config.schedule_interval(), |_, ctx| {
-            ctx.notify(TrySchedule::new());
+            let delay: u64 = thread_rng().gen_range(0..1000);
+            ctx.notify_later(TrySchedule::new(), Duration::from_millis(delay));
         });
 
         // gc task
