@@ -9,7 +9,7 @@ use mongodb::options::{FindOneAndUpdateOptions, ReturnDocument};
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::db::{Collection, DBOperation};
@@ -33,6 +33,10 @@ impl<T> UpdateEntryOp<T> {
 impl<T: Serialize + Sync> DBOperation for UpdateEntryOp<T> {
     type Result = bool;
     type Item = Document;
+
+    fn desc() -> &'static str {
+        "UpdateEntry"
+    }
 
     async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let mut body = if let Some(body) = &self.body {
@@ -104,6 +108,10 @@ impl DBOperation for GetAllTasksCount {
     type Result = u64;
     type Item = Document;
 
+    fn desc() -> &'static str {
+        "GetAllTasksCount"
+    }
+
     async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         collection
             .count_documents(self.base_query.clone(), None)
@@ -122,6 +130,10 @@ pub struct GetWorkerInfoOp {
 impl DBOperation for GetWorkerInfoOp {
     type Result = Vec<WorkerInfo>;
     type Item = WorkerInfo;
+
+    fn desc() -> &'static str {
+        "GetWorkerInfo"
+    }
 
     async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let filter_query = doc! {
@@ -178,6 +190,10 @@ impl GetTasksOnWorkerOp {
 impl DBOperation for GetTasksOnWorkerOp {
     type Result = Vec<TaskInfo>;
     type Item = TaskInfo;
+
+    fn desc() -> &'static str {
+        "GetTasksOnWorker"
+    }
 
     async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let filter_query = doc! {
@@ -331,6 +347,10 @@ impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
     type Result = Option<(TaskInfo, T)>;
     type Item = Document;
 
+    fn desc() -> &'static str {
+        "Schedule"
+    }
+
     async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         Ok(match self.mode {
             ScheduleMode::Auto => {
@@ -339,7 +359,10 @@ impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
                 } else {
                     loop {
                         match self.do_schedule_once(collection).await? {
-                            ScheduleResult::Conflict => continue,
+                            ScheduleResult::Conflict => {
+                                warn!("steal conflict, retry");
+                                continue;
+                            }
                             ScheduleResult::Some(res) => break Some(res),
                             ScheduleResult::None => break None,
                         }

@@ -1,6 +1,8 @@
+use std::ops::Deref;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actix::Addr;
+use actix_web::rt::task::JoinHandle;
 
 use crate::scheduler::actor::ScheduleActor;
 
@@ -119,4 +121,53 @@ macro_rules! impl_to_collector_handler {
 #[allow(clippy::cast_possible_truncation)]
 pub fn timestamp(t: SystemTime) -> i64 {
     t.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64
+}
+
+pub struct CancelOnDrop<T> {
+    handle: JoinHandle<T>,
+}
+
+impl<T> CancelOnDrop<T> {
+    pub fn new(handle: JoinHandle<T>) -> Self {
+        CancelOnDrop { handle }
+    }
+}
+
+impl<T> Deref for CancelOnDrop<T> {
+    type Target = JoinHandle<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.handle
+    }
+}
+
+impl<T> Drop for CancelOnDrop<T> {
+    fn drop(&mut self) {
+        self.handle.abort()
+    }
+}
+
+pub struct CustomGuard<T>
+where
+    T: FnMut(),
+{
+    on_exit: T,
+}
+
+impl<T> CustomGuard<T>
+where
+    T: FnMut(),
+{
+    pub fn new(on_exit: T) -> Self {
+        CustomGuard { on_exit }
+    }
+}
+
+impl<T> Drop for CustomGuard<T>
+where
+    T: FnMut(),
+{
+    fn drop(&mut self) {
+        (self.on_exit)()
+    }
 }

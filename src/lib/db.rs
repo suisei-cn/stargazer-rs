@@ -1,11 +1,15 @@
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::time::Duration;
 
 use async_trait::async_trait;
 pub use mongodb::bson::Document;
 pub use mongodb::error::Result as DBResult;
 pub use mongodb::Collection;
 use mongodb::{Client, Database};
+use tracing::{trace, warn};
+
+use crate::utils::{CancelOnDrop, CustomGuard};
 
 pub struct Coll<T> {
     coll: Collection<Document>,
@@ -32,11 +36,18 @@ impl<T> Deref for Coll<T> {
 #[async_trait]
 pub trait DBOperation {
     type Result;
-    type Item: Sync;
+    type Item: Send + Sync;
+    fn desc() -> &'static str;
     async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result>;
     async fn execute<T: Sync>(&self, collection: &Collection<T>) -> DBResult<Self::Result> {
-        self.execute_impl(transmute_collection_ref(collection))
-            .await
+        let _timeout_guard = CancelOnDrop::new(actix::spawn(async {
+            actix_web::rt::time::sleep(Duration::from_secs(1)).await;
+            warn!("{} op blocked for more than 1 secs", Self::desc());
+        }));
+        let _log_guard = CustomGuard::new(|| trace!("{} op completed", Self::desc()));
+
+        trace!("{} op started", Self::desc());
+        self.execute_impl(&collection.clone_with_type()).await
     }
 }
 
