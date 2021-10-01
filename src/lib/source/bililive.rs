@@ -111,7 +111,10 @@ impl Actor for BililiveActor {
                         info!("stream added");
                         Self::add_stream(stream, ctx);
                     }
-                    Err(e) => warn!("failed to connect stream: {}", e),
+                    Err(e) => {
+                        error!("failed to connect stream: {}", e);
+                        ctx.stop()
+                    }
                 })
                 .actor_instrument(self.span()),
         );
@@ -156,8 +159,10 @@ pub async fn set(
     coll: web::Data<Coll<BililiveColl>>,
     entry: web::Query<BililiveEntry>,
 ) -> impl Responder {
+    debug!("writing to db");
     coll.insert_one(&bson::to_document(&*entry).unwrap(), None)
         .await
         .unwrap();
+    debug!("writing to db ok");
     "ok"
 }
