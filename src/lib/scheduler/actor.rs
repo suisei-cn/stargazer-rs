@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
@@ -18,6 +19,7 @@ use uuid::Uuid;
 
 use crate::common::ResponseWrapper;
 use crate::config::ScheduleConfig;
+use crate::context::MessageTarget;
 use crate::db::{Collection, DBOperation, DBResult, Document};
 use crate::scheduler::messages::UpdateEntry;
 use crate::scheduler::ops::UpdateEntryOp;
@@ -65,6 +67,35 @@ where
     pub(crate) config: ScheduleConfig,
     #[builder(default, setter(skip))]
     pub(crate) ctx: ScheduleContext<T>,
+}
+
+#[derive(Debug)]
+pub struct ScheduleTarget<T>(PhantomData<T>);
+
+impl<T> ScheduleTarget<T> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl<T> Default for ScheduleTarget<T> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<T> Clone for ScheduleTarget<T> {
+    fn clone(&self) -> Self {
+        Self(PhantomData)
+    }
+}
+impl<T> Copy for ScheduleTarget<T> {}
+
+unsafe impl<T> Send for ScheduleTarget<T> {}
+
+impl<T: Task> MessageTarget for ScheduleTarget<T> {
+    type Actor = ScheduleActor<T>;
+    type Addr = Addr<ScheduleActor<T>>;
 }
 
 impl<T: Task> Debug for ScheduleActor<T> {

@@ -2,7 +2,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use actix::Actor;
-use actix_web::web;
+use actix::fut::ready;
+use actix_web::{web, get, Responder};
 use actix_web::web::Data;
 use clap::{AppSettings, Clap};
 
@@ -13,7 +14,9 @@ use stargazer_lib::db::{connect_db, Coll, Collection, Document};
 use stargazer_lib::scheduler::ScheduleActor;
 use stargazer_lib::source::bililive::{BililiveActor, BililiveColl};
 use stargazer_lib::source::twitter::{TwitterActor, TwitterColl, TwitterCtor};
-use stargazer_lib::{ArbiterContext, Config, ScheduleConfig, Server, TwitterConfig, AMQP};
+use stargazer_lib::{ArbiterContext, Config, ScheduleConfig, Server, TwitterConfig, AMQP, InstanceContext};
+use stargazer_lib::scheduler::actor::ScheduleTarget;
+use stargazer_lib::scheduler::messages::ActorsIter;
 
 #[derive(Clap)]
 #[clap(
@@ -25,6 +28,16 @@ struct Opts {
     /// Sets a custom config file. This flag overrides system-wide and user-wide configs.
     #[clap(short, long)]
     config: Option<PathBuf>,
+}
+
+#[get("/status")]
+async fn status(ctx: web::Data<InstanceContext>) -> impl Responder {
+    let resp = ctx.send(ScheduleTarget::<BililiveActor>::new(), &ActorsIter::new(|map| {
+        let len = map.len();
+        Box::pin(ready(len))
+    })).unwrap().await.unwrap();
+
+    format!("{:#?}", resp)
 }
 
 #[actix_web::main]
