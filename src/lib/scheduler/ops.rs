@@ -370,9 +370,15 @@ impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
                 }
             }
             ScheduleMode::OutdatedOnly => self.do_acquire(collection).await?,
-            ScheduleMode::StealOnly => match self.do_schedule_once(collection).await? {
-                ScheduleResult::Some(res) => Some(res),
-                _ => None,
+            ScheduleMode::StealOnly => loop {
+                match self.do_schedule_once(collection).await? {
+                    ScheduleResult::Conflict => {
+                        warn!("steal conflict, retry");
+                        continue;
+                    }
+                    ScheduleResult::Some(res) => break Some(res),
+                    ScheduleResult::None => break None,
+                }
             },
         }
         .map(|res| {
