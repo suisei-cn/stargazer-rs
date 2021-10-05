@@ -2293,6 +2293,7 @@ name = "stargazer-rs"
 version = "0.1.0"
 dependencies = [
  "actix",
+ "actix-rt",
  "actix-web",
  "arraydeque",
  "async-trait",

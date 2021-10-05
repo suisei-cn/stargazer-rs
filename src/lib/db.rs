@@ -41,7 +41,7 @@ pub trait DBOperation {
     async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result>;
     async fn execute<T: Sync>(&self, collection: &Collection<T>) -> DBResult<Self::Result> {
         let _timeout_guard = CancelOnDrop::new(actix::spawn(async {
-            actix_web::rt::time::sleep(Duration::from_secs(1)).await;
+            actix_rt::time::sleep(Duration::from_secs(1)).await;
             warn!("{} op blocked for more than 1 secs", Self::desc());
         }));
         let _log_guard = CustomGuard::new(|| trace!("{} op completed", Self::desc()));

@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actix::Addr;
-use actix_web::rt::task::JoinHandle;
+use actix_rt::task::JoinHandle;
 
 use crate::scheduler::actor::ScheduleActor;
 

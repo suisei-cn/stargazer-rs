@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 use actix::dev::{Request, ToEnvelope};
 use actix::MailboxError;
 use actix::{Actor, Addr, Handler, Message};
-use actix_web::rt::Runtime;
+use actix_rt::Runtime;
 use futures::future::{Join, JoinAll};
 use futures::ready;
 use pin_project::pin_project;
