@@ -52,6 +52,9 @@ pub struct Schedule {
     /// Interval between schedule attempts.
     #[serde(with = "humantime_serde")]
     schedule_interval: Duration,
+    /// Interval between balance schedule attempts.
+    #[serde(with = "humantime_serde")]
+    balance_interval: Duration,
     /// Max allowed duration for an entry to be an orphan.
     #[serde(with = "humantime_serde")]
     max_interval: Duration,
@@ -61,6 +64,9 @@ impl Schedule {
     pub const fn schedule_interval(&self) -> Duration {
         self.schedule_interval
     }
+    pub const fn balance_interval(&self) -> Duration {
+        self.balance_interval
+    }
     pub const fn max_interval(&self) -> Duration {
         self.max_interval
     }
@@ -69,8 +75,9 @@ impl Schedule {
 impl Default for Schedule {
     fn default() -> Self {
         Self {
-            schedule_interval: Duration::from_secs(3),
-            max_interval: Duration::from_secs(10),
+            schedule_interval: Duration::from_secs(5),
+            balance_interval: Duration::from_secs(30),
+            max_interval: Duration::from_secs(60),
         }
     }
 }

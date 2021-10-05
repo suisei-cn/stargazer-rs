@@ -6,9 +6,10 @@ use uuid::Uuid;
 
 use crate::db::DBResult;
 use crate::scheduler::models::TaskInfo;
+use crate::scheduler::ops::ScheduleMode;
 
 #[derive(Debug, Copy, Clone)]
-pub struct TrySchedule<T>(PhantomData<T>);
+pub struct TrySchedule<T>(pub(crate) ScheduleMode, PhantomData<T>);
 
 impl<T: Actor> Message for TrySchedule<T> {
     type Result = DBResult<Option<(Uuid, Addr<T>)>>;
@@ -66,15 +67,9 @@ where
     type Result = Output;
 }
 
-impl<T> Default for TrySchedule<T> {
-    fn default() -> Self {
-        Self(PhantomData)
-    }
-}
-
 impl<T> TrySchedule<T> {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(mode: ScheduleMode) -> Self {
+        Self(mode, PhantomData)
     }
 }
 

@@ -22,11 +22,11 @@ use crate::config::ScheduleConfig;
 use crate::context::MessageTarget;
 use crate::db::{Collection, DBOperation, DBResult, Document};
 use crate::scheduler::messages::UpdateEntry;
-use crate::scheduler::ops::UpdateEntryOp;
+use crate::scheduler::ops::{ScheduleMode, UpdateEntryOp};
 
 use super::messages::{ActorsIter, GetId, TriggerGC, TrySchedule};
 use super::models::SchedulerMeta;
-use super::ops::{ScheduleMode, ScheduleOp};
+use super::ops::ScheduleOp;
 use super::Task;
 
 #[derive(Debug, Clone)]
@@ -237,7 +237,11 @@ where
         // schedule task
         ctx.run_interval(self.config.schedule_interval(), |_, ctx| {
             let delay: u64 = thread_rng().gen_range(0..1000);
-            ctx.notify_later(TrySchedule::new(), Duration::from_millis(delay));
+            ctx.notify_later(TrySchedule::new(ScheduleMode::OutdatedOnly), Duration::from_millis(delay));
+        });
+        ctx.run_interval(self.config.balance_interval(), |_, ctx| {
+            let delay: u64 = thread_rng().gen_range(0..1000);
+            ctx.notify_later(TrySchedule::new(ScheduleMode::StealOnly), Duration::from_millis(delay));
         });
 
         // gc task
