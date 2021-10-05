@@ -105,7 +105,7 @@ impl ArbiterContext {
         &self,
         _target: Target,
         msg: MsgT,
-    ) -> Result<MsgRequest<'_, Act, MsgT>>
+    ) -> Result<MsgRequest<Act, MsgT>>
     where
         Target: MessageTarget<Actor = Act, Addr = AddrT>,
         Act: Actor + Handler<MsgT>,
@@ -120,7 +120,7 @@ impl ArbiterContext {
             .ok_or(Error::Context)?
             .downcast_ref()
             .unwrap();
-        Ok(MsgRequest::new(addr, msg))
+        Ok(MsgRequest::new(addr.clone(), msg))
     }
 }
 
@@ -179,14 +179,12 @@ impl InstanceContext {
         AddrT: 'static,
         Output: Send + 'a,
     {
-        // MsgRequestVec::new(
-        let ids: Vec<_> = self
-            .arbiters
+        let arbiters = self.arbiters.read().clone();
+        let ids: Vec<_> = arbiters
             .iter()
             .map(|arbiter| arbiter.send(target, GetId))
             .try_collect()?;
-        let resps: Vec<_> = self
-            .arbiters
+        let resps: Vec<_> = arbiters
             .iter()
             .map(|arbiter| arbiter.send(target, msg.clone()))
             .try_collect()?;

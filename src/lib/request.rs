@@ -12,7 +12,7 @@ use futures::future::{Join, JoinAll};
 use futures::ready;
 use pin_project::pin_project;
 
-pub trait RequestTrait<'a>: RequestTraitBoxExt {
+pub trait RequestTrait: RequestTraitBoxExt {
     /// Sends messages unconditionally, bypassing mailbox limit and ignore its response.
     fn immediately(self);
     /// Sends messages with blocking.
@@ -21,7 +21,7 @@ pub trait RequestTrait<'a>: RequestTraitBoxExt {
     /// Panics when called in an `actix-rt`(`tokio`) context, or any `MsgRequest` has already been polled halfway.
     fn blocking(self) -> Self::Output;
 
-    fn join<R: RequestTrait<'a> + Sized>(self, other: R) -> MsgRequestTuple<Self, R>
+    fn join<R: RequestTrait + Sized>(self, other: R) -> MsgRequestTuple<Self, R>
     where
         Self: Sized,
     {
@@ -35,9 +35,9 @@ pub trait RequestTrait<'a>: RequestTraitBoxExt {
         MsgRequestMap::new(self, f)
     }
 
-    fn into_pinned_box(self) -> Pin<Box<dyn RequestTrait<'a, Output = Self::Output> + 'a>>
+    fn into_pinned_box(self) -> Pin<Box<dyn RequestTrait<Output = Self::Output>>>
     where
-        Self: 'a + Sized,
+        Self: 'static + Sized,
     {
         Box::pin(self)
     }
@@ -48,7 +48,7 @@ pub trait RequestTraitBoxExt: Future {
     fn pinned_blocking(self: Pin<Box<Self>>) -> Self::Output;
 }
 
-impl<'a, T: RequestTrait<'a>> RequestTraitBoxExt for T {
+impl<T: RequestTrait> RequestTraitBoxExt for T {
     // SAFETY
     // If `self` is in any of the Unpin state, it will immediately panic
     fn pinned_immediately(self: Pin<Box<Self>>) {
@@ -64,7 +64,7 @@ impl<'a, T: RequestTrait<'a>> RequestTraitBoxExt for T {
     }
 }
 
-impl<'a, O> RequestTrait<'a> for Pin<Box<dyn RequestTrait<'a, Output = O> + 'a>> {
+impl<O> RequestTrait for Pin<Box<dyn RequestTrait<Output = O>>> {
     fn immediately(self) {
         self.pinned_immediately();
     }
@@ -95,9 +95,9 @@ where
     }
 }
 
-impl<'a, R, O, F> RequestTrait<'_> for MsgRequestMap<R, O, F>
+impl<R, O, F> RequestTrait for MsgRequestMap<R, O, F>
 where
-    R: RequestTrait<'a>,
+    R: RequestTrait,
     F: FnOnce(R::Output) -> O,
 {
     fn immediately(self) {
@@ -153,7 +153,7 @@ impl<R1: Future, R2: Future> MsgRequestTuple<R1, R2> {
     }
 }
 
-impl<'a, R1: RequestTrait<'a>, R2: RequestTrait<'a>> RequestTrait<'_> for MsgRequestTuple<R1, R2> {
+impl<R1: RequestTrait, R2: RequestTrait> RequestTrait for MsgRequestTuple<R1, R2> {
     fn immediately(self) {
         if let Self::Init(r1, r2) = self {
             r1.unwrap().immediately();
@@ -174,7 +174,7 @@ impl<'a, R1: RequestTrait<'a>, R2: RequestTrait<'a>> RequestTrait<'_> for MsgReq
     }
 }
 
-impl<'a, R1: RequestTrait<'a>, R2: RequestTrait<'a>> Future for MsgRequestTuple<R1, R2> {
+impl<R1: RequestTrait, R2: RequestTrait> Future for MsgRequestTuple<R1, R2> {
     type Output = (R1::Output, R2::Output);
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -237,7 +237,7 @@ impl<R: Future> Add<R> for MsgRequestVec<R> {
     }
 }
 
-impl<'a, R: RequestTrait<'a>> RequestTrait<'a> for MsgRequestVec<R> {
+impl<R: RequestTrait> RequestTrait for MsgRequestVec<R> {
     fn immediately(self) {
         if let Self::Init(l) = self {
             l.into_iter().for_each(RequestTrait::immediately);
@@ -258,7 +258,7 @@ impl<'a, R: RequestTrait<'a>> RequestTrait<'a> for MsgRequestVec<R> {
     }
 }
 
-impl<'a, R: RequestTrait<'a>> Future for MsgRequestVec<R> {
+impl<R: RequestTrait> Future for MsgRequestVec<R> {
     type Output = Vec<R::Output>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -282,26 +282,26 @@ impl<'a, R: RequestTrait<'a>> Future for MsgRequestVec<R> {
 
 #[must_use = "You have to await on request, call `blocking()` or `immediately()`, otherwise the message wont be delivered"]
 #[pin_project(project = MsgRequestProj)]
-pub enum MsgRequest<'a, A, M>
+pub enum MsgRequest<A, M>
 where
     A: Actor + Handler<M>,
     A::Context: ToEnvelope<A, M>,
     M: Message + Send + 'static,
     M::Result: Send,
 {
-    Initial { target: &'a Addr<A>, msg: Option<M> },
+    Initial { target: Addr<A>, msg: Option<M> },
     Pending(#[pin] Request<A, M>),
     Gone,
 }
 
-impl<'a, A, M> MsgRequest<'a, A, M>
+impl<A, M> MsgRequest<A, M>
 where
     A: Actor + Handler<M>,
     A::Context: ToEnvelope<A, M>,
     M: Message + Send + 'static,
     M::Result: Send,
 {
-    pub fn new(target: &'a Addr<A>, msg: M) -> Self {
+    pub fn new(target: Addr<A>, msg: M) -> Self {
         Self::Initial {
             target,
             msg: Some(msg),
@@ -309,7 +309,7 @@ where
     }
 }
 
-impl<'a, A, M, O> RequestTrait<'_> for MsgRequest<'a, A, M>
+impl<A, M, O> RequestTrait for MsgRequest<A, M>
 where
     A: Actor + Handler<M>,
     A::Context: ToEnvelope<A, M>,
@@ -337,7 +337,7 @@ where
     }
 }
 
-impl<'a, A, M, O> Future for MsgRequest<'a, A, M>
+impl<A, M, O> Future for MsgRequest<A, M>
 where
     A: Actor + Handler<M>,
     A::Context: ToEnvelope<A, M>,
@@ -378,7 +378,7 @@ mod tests {
     #[actix::test]
     async fn must_req_do() {
         let addr = Echo::default().start();
-        let req = MsgRequest::new(&addr, Ping(42, false));
+        let req = MsgRequest::new(addr.clone(), Ping(42, false));
         req.immediately();
         tokio::task::yield_now().await;
         assert_eq!(addr.send(Query).await.unwrap(), 42, "message not delivered");
@@ -387,7 +387,7 @@ mod tests {
     #[actix::test]
     async fn must_req_await() {
         let addr = Echo::default().start();
-        let req = MsgRequest::new(&addr, Ping(42, false));
+        let req = MsgRequest::new(addr, Ping(42, false));
         assert_eq!(req.await.unwrap(), 42, "response incorrect");
     }
 
@@ -406,7 +406,7 @@ mod tests {
         });
 
         let addr = rx.recv().unwrap();
-        let req = MsgRequest::new(&addr, Ping(42, true));
+        let req = MsgRequest::new(addr, Ping(42, true));
         assert_eq!(req.blocking().unwrap(), 42, "response incorrect");
 
         sys_thread.join().unwrap(); // sys thread should join and mustn't panic
@@ -418,9 +418,9 @@ mod tests {
         let addr2 = Echo::default().start();
         let addr3 = Echo::default().start();
         let reqs = MsgRequestVec::new([
-            MsgRequest::new(&addr1, Ping(41, false)),
-            MsgRequest::new(&addr2, Ping(42, false)),
-            MsgRequest::new(&addr3, Ping(43, false)),
+            MsgRequest::new(addr1.clone(), Ping(41, false)),
+            MsgRequest::new(addr2.clone(), Ping(42, false)),
+            MsgRequest::new(addr3.clone(), Ping(43, false)),
         ]);
         reqs.immediately();
         tokio::task::yield_now().await;
@@ -445,9 +445,9 @@ mod tests {
     async fn must_req_vec_await() {
         let addr = Echo::default().start();
         let reqs = MsgRequestVec::new([
-            MsgRequest::new(&addr, Ping(41, false)),
-            MsgRequest::new(&addr, Ping(42, false)),
-            MsgRequest::new(&addr, Ping(43, false)),
+            MsgRequest::new(addr.clone(), Ping(41, false)),
+            MsgRequest::new(addr.clone(), Ping(42, false)),
+            MsgRequest::new(addr, Ping(43, false)),
         ]);
         assert_eq!(
             reqs.await
@@ -474,7 +474,7 @@ mod tests {
         });
 
         let addr = rx.recv().unwrap();
-        let reqs = MsgRequestVec::new([MsgRequest::new(&addr, Ping(42, true))]);
+        let reqs = MsgRequestVec::new([MsgRequest::new(addr, Ping(42, true))]);
         assert_eq!(
             reqs.blocking()
                 .into_iter()
@@ -492,8 +492,8 @@ mod tests {
         let addr1 = Echo::default().start();
         let addr2 = Echo::default().start();
         let reqs = MsgRequestTuple::new(
-            MsgRequest::new(&addr1, Ping(41, false)),
-            MsgRequest::new(&addr2, Ping(42, false)),
+            MsgRequest::new(addr1.clone(), Ping(41, false)),
+            MsgRequest::new(addr2.clone(), Ping(42, false)),
         );
         reqs.immediately();
         tokio::task::yield_now().await;
@@ -513,8 +513,8 @@ mod tests {
     async fn must_req_tuple_await() {
         let addr = Echo::default().start();
         let reqs = MsgRequestTuple::new(
-            MsgRequest::new(&addr, Ping(41, false)),
-            MsgRequest::new(&addr, Ping(42, false)),
+            MsgRequest::new(addr.clone(), Ping(41, false)),
+            MsgRequest::new(addr, Ping(42, false)),
         );
         let res = reqs.await;
         assert_eq!(res.0.unwrap(), 41, "response incorrect");
@@ -524,7 +524,7 @@ mod tests {
     #[actix::test]
     async fn must_req_dyn_do() {
         let addr = Echo::default().start();
-        let req = MsgRequest::new(&addr, Ping(42, false)).into_pinned_box();
+        let req = MsgRequest::new(addr.clone(), Ping(42, false)).into_pinned_box();
         req.immediately();
         tokio::task::yield_now().await;
         assert_eq!(addr.send(Query).await.unwrap(), 42, "message not delivered");
@@ -533,7 +533,7 @@ mod tests {
     #[actix::test]
     async fn must_req_dyn_await() {
         let addr = Echo::default().start();
-        let req = MsgRequest::new(&addr, Ping(42, false)).into_pinned_box();
+        let req = MsgRequest::new(addr, Ping(42, false)).into_pinned_box();
         assert_eq!(req.await.unwrap(), 42, "response incorrect");
     }
 
@@ -552,7 +552,7 @@ mod tests {
         });
 
         let addr = rx.recv().unwrap();
-        let req = MsgRequest::new(&addr, Ping(42, true)).into_pinned_box();
+        let req = MsgRequest::new(addr, Ping(42, true)).into_pinned_box();
         assert_eq!(req.blocking().unwrap(), 42, "response incorrect");
 
         sys_thread.join().unwrap(); // sys thread should join and mustn't panic
