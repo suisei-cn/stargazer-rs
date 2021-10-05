@@ -6,6 +6,7 @@ use actix::dev::ToEnvelope;
 use actix::{Actor, Addr, Handler, MailboxError, Message};
 use itertools::Itertools;
 use once_cell::unsync::OnceCell;
+use parking_lot::RwLock;
 use uuid::Uuid;
 
 use crate::error::{Error, Result};
@@ -123,10 +124,10 @@ impl ArbiterContext {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct InstanceContext {
     instance_id: Uuid,
-    arbiters: Vec<ArbiterContext>,
+    arbiters: RwLock<Vec<ArbiterContext>>,
 }
 
 impl InstanceContext {
@@ -139,7 +140,7 @@ impl Default for InstanceContext {
     fn default() -> Self {
         Self {
             instance_id: Uuid::new_v4(),
-            arbiters: vec![],
+            arbiters: RwLock::new(vec![]),
         }
     }
 }
@@ -151,8 +152,8 @@ impl InstanceContext {
     pub const fn id(&self) -> Uuid {
         self.instance_id
     }
-    pub fn register(&mut self, ctx: ArbiterContext) {
-        self.arbiters.push(ctx);
+    pub fn register(&self, ctx: ArbiterContext) {
+        self.arbiters.write().push(ctx);
     }
 
     /// Send a message to a registered actor.
@@ -238,7 +239,7 @@ mod tests {
 
     #[actix::test]
     async fn must_instance_send() {
-        let mut inst = InstanceContext::new();
+        let inst = InstanceContext::new();
         let arb_1 = ArbiterContext::new(inst.instance_id()).register_addr(Echo::default().start());
         let arb_2 = ArbiterContext::new(inst.instance_id()).register_addr(Echo2::default().start());
         inst.register(arb_1);
@@ -248,7 +249,7 @@ mod tests {
             "unexpected addr"
         );
 
-        let mut inst = InstanceContext::new();
+        let inst = InstanceContext::new();
         let arb_1 = ArbiterContext::new(inst.instance_id())
             .register_addr(Echo::default().start())
             .register_addr(Adder::new(0).start());

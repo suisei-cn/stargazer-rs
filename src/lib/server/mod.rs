@@ -11,7 +11,6 @@ use actix_web::middleware::Logger;
 use actix_web::web::{Data, ServiceConfig};
 use actix_web::App;
 use actix_web::HttpServer;
-use parking_lot::RwLock;
 use pin_project::pin_project;
 use tokio::sync::mpsc::unbounded_channel;
 use uuid::Uuid;
@@ -79,7 +78,7 @@ where
 {
     factory: F,
     workers: usize,
-    instance_ctx: Arc<RwLock<InstanceContext>>,
+    instance_ctx: InstanceContext,
 }
 
 impl<F, SF> Server<F, SF>
@@ -95,7 +94,7 @@ where
         Self {
             factory,
             workers: num_cpus::get(),
-            instance_ctx: Arc::new(RwLock::new(ctx)),
+            instance_ctx: ctx,
         }
     }
 
@@ -122,8 +121,8 @@ where
     ///
     /// Returns `std::io::Error` if error occur when binding the port.
     pub fn run(self, mode: ServerMode) -> std::io::Result<ServerHandler> {
-        let instance_id = self.instance_ctx.read().id();
-        let instance_ctx = self.instance_ctx;
+        let instance_id = self.instance_ctx.id();
+        let instance_ctx = Arc::new(self.instance_ctx);
         let factory = self.factory;
 
         match mode {
@@ -138,7 +137,7 @@ where
                         let (ctx, _) = factory(instance_id);
                         WatchdogActor::start(tx);
                         ArbiterContext::set(ctx.clone());
-                        instance_ctx.write().register(ctx);
+                        instance_ctx.register(ctx);
                     });
                 };
                 for _ in 0..self.workers {
@@ -153,13 +152,14 @@ where
             }
             ServerMode::HTTP { port } => {
                 let srv = HttpServer::new(move || {
+                    let instance_ctx = instance_ctx.clone();
                     let (ctx, http_services) = factory(instance_id);
                     ArbiterContext::set(ctx.clone());
-                    instance_ctx.write().register(ctx.clone());
+                    instance_ctx.register(ctx.clone());
                     App::new()
                         .wrap(Logger::default())
                         .app_data(Data::new(ctx))
-                        .app_data(Data::new(instance_ctx.read().clone()))
+                        .app_data(Data::from(instance_ctx))
                         .configure(http_services)
                 })
                 .workers(self.workers)
