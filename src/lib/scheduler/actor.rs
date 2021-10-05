@@ -167,9 +167,10 @@ where
     }
 }
 
-impl<T, U: 'static + Serialize + Sync> Handler<UpdateEntry<U>> for ScheduleActor<T>
+impl<T, U> Handler<UpdateEntry<U>> for ScheduleActor<T>
 where
     T: 'static + Task + Actor<Context = Context<T>> + Unpin,
+    U: 'static + Serialize + Send,
 {
     type Result = AtomicResponse<Self, DBResult<bool>>;
 
@@ -237,11 +238,17 @@ where
         // schedule task
         ctx.run_interval(self.config.schedule_interval(), |_, ctx| {
             let delay: u64 = thread_rng().gen_range(0..1000);
-            ctx.notify_later(TrySchedule::new(ScheduleMode::OutdatedOnly), Duration::from_millis(delay));
+            ctx.notify_later(
+                TrySchedule::new(ScheduleMode::OutdatedOnly),
+                Duration::from_millis(delay),
+            );
         });
         ctx.run_interval(self.config.balance_interval(), |_, ctx| {
             let delay: u64 = thread_rng().gen_range(0..1000);
-            ctx.notify_later(TrySchedule::new(ScheduleMode::StealOnly), Duration::from_millis(delay));
+            ctx.notify_later(
+                TrySchedule::new(ScheduleMode::StealOnly),
+                Duration::from_millis(delay),
+            );
         });
 
         // gc task

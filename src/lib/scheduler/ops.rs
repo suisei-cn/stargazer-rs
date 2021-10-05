@@ -30,7 +30,7 @@ impl<T> UpdateEntryOp<T> {
 }
 
 #[async_trait]
-impl<T: Serialize + Sync> DBOperation for UpdateEntryOp<T> {
+impl<T: Serialize + Send> DBOperation for UpdateEntryOp<T> {
     type Result = bool;
     type Item = Document;
 
@@ -38,7 +38,7 @@ impl<T: Serialize + Sync> DBOperation for UpdateEntryOp<T> {
         "UpdateEntry"
     }
 
-    async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
+    async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let mut body = if let Some(body) = &self.body {
             bson::to_document(body)?
         } else {
@@ -112,7 +112,7 @@ impl DBOperation for GetAllTasksCount {
         "GetAllTasksCount"
     }
 
-    async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
+    async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         collection
             .count_documents(self.base_query.clone(), None)
             .await
@@ -135,7 +135,7 @@ impl DBOperation for GetWorkerInfoOp {
         "GetWorkerInfo"
     }
 
-    async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
+    async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let filter_query = doc! {
             "$match": {
                 "$and": [
@@ -195,7 +195,7 @@ impl DBOperation for GetTasksOnWorkerOp {
         "GetTasksOnWorker"
     }
 
-    async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
+    async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let filter_query = doc! {
             "$and": [
                 {"parent_uuid": self.worker.to_string()},   // select worker
@@ -351,7 +351,7 @@ impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
         "Schedule"
     }
 
-    async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
+    async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         Ok(match self.mode {
             ScheduleMode::Auto => {
                 if let Some(res) = self.do_acquire(collection).await? {

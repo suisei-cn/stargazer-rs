@@ -34,12 +34,12 @@ impl<T> Deref for Coll<T> {
 }
 
 #[async_trait]
-pub trait DBOperation {
+pub trait DBOperation: Sized {
     type Result;
     type Item: Send + Sync;
     fn desc() -> &'static str;
-    async fn execute_impl(&self, collection: &Collection<Self::Item>) -> DBResult<Self::Result>;
-    async fn execute<T: Sync>(&self, collection: &Collection<T>) -> DBResult<Self::Result> {
+    async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result>;
+    async fn execute<T: Sync>(self, collection: &Collection<T>) -> DBResult<Self::Result> {
         let _timeout_guard = CancelOnDrop::new(actix::spawn(async {
             actix_rt::time::sleep(Duration::from_secs(1)).await;
             warn!("{} op blocked for more than 1 secs", Self::desc());
