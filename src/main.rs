@@ -49,8 +49,8 @@ async fn main() {
     let collector_config = config.collector().clone();
     let sched_config = ScheduleConfig::default();
 
-    let source_config = config.source();
-    let twitter_config = source_config.twitter();
+    let source_config = config.source().clone();
+    let twitter_config = source_config.twitter().clone();
 
     let db = connect_db(config.mongodb().uri(), config.mongodb().database())
         .await
@@ -58,36 +58,36 @@ async fn main() {
     let coll_bililive: Collection<Document> = db.collection("bililive");
     let coll_twitter: Collection<Document> = db.collection("twitter");
 
-    let bililive_actor: ScheduleActor<BililiveActor> = ScheduleActor::builder()
-        .collection(coll_bililive.clone())
-        .ctor_builder(ScheduleConfig::default)
-        .config(sched_config)
-        .build();
-
-    let twitter_actor: Option<ScheduleActor<TwitterActor>> =
-        if let TwitterConfig::Enabled { token } = twitter_config {
-            let token = token.clone();
-            Some(
-                ScheduleActor::builder()
-                    .collection(coll_twitter.clone())
-                    .ctor_builder(move || TwitterCtor::new(sched_config, &*token))
-                    .config(sched_config)
-                    .build(),
-            )
-        } else {
-            None
-        };
-
-    let arc_coll_bililive: Arc<Coll<BililiveColl>> = Arc::new(Coll::new(coll_bililive));
-    let arc_coll_twitter: Arc<Coll<TwitterColl>> = Arc::new(Coll::new(coll_twitter));
+    let arc_coll_bililive: Arc<Coll<BililiveColl>> = Arc::new(Coll::new(coll_bililive.clone()));
+    let arc_coll_twitter: Arc<Coll<TwitterColl>> = Arc::new(Coll::new(coll_twitter.clone()));
 
     Server::new(move |instance_id| {
         let collector_config = collector_config.clone();
         let ctx = ArbiterContext::new(instance_id);
 
-        let bililive_addr = bililive_actor.clone().start();
+        let bililive_actor: ScheduleActor<BililiveActor> = ScheduleActor::builder()
+            .collection(coll_bililive.clone())
+            .ctor_builder(ScheduleConfig::default)
+            .config(sched_config)
+            .build();
 
-        let twitter_addr = twitter_actor.clone().map(Actor::start);
+        let twitter_actor: Option<ScheduleActor<TwitterActor>> =
+            if let TwitterConfig::Enabled { token } = &twitter_config {
+                let token = token.clone();
+                Some(
+                    ScheduleActor::builder()
+                        .collection(coll_twitter.clone())
+                        .ctor_builder(move || TwitterCtor::new(sched_config, &*token))
+                        .config(sched_config)
+                        .build(),
+                )
+            } else {
+                None
+            };
+
+        let bililive_addr = bililive_actor.start();
+
+        let twitter_addr = twitter_actor.map(Actor::start);
 
         // TODO blocked by edition 2021
         #[allow(clippy::option_if_let_else)]
@@ -116,6 +116,7 @@ async fn main() {
             move |cfg| {
                 cfg.app_data(Data::from(arc_coll_bililive))
                     .app_data(Data::from(arc_coll_twitter))
+                    .service(status)
                     .service(web::scope("/bililive").service(stargazer_lib::source::bililive::set))
                     .service(web::scope("/twitter").service(stargazer_lib::source::twitter::set));
             },
