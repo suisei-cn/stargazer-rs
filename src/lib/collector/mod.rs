@@ -13,7 +13,7 @@ use actix::{
 use arraydeque::{ArrayDeque, Wrapping};
 use async_trait::async_trait;
 use serde::Serialize;
-use tracing::{trace, debug, error, info, info_span, warn, Span};
+use tracing::{debug, error, info, info_span, trace, warn, Span};
 use tracing_actix::ActorInstrument;
 
 use crate::ArbiterContext;

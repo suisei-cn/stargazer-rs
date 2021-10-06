@@ -1,22 +1,24 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use actix::Actor;
 use actix::fut::ready;
-use actix_web::{web, get, Responder};
+use actix::Actor;
 use actix_web::web::Data;
+use actix_web::{get, web, Responder};
 use clap::{AppSettings, Clap};
 
 use stargazer_lib::collector::amqp::AMQPFactory;
 use stargazer_lib::collector::debug::DebugCollectorFactory;
 use stargazer_lib::collector::CollectorActor;
 use stargazer_lib::db::{connect_db, Coll, Collection, Document};
+use stargazer_lib::scheduler::actor::ScheduleTarget;
+use stargazer_lib::scheduler::messages::ActorsIter;
 use stargazer_lib::scheduler::ScheduleActor;
 use stargazer_lib::source::bililive::{BililiveActor, BililiveColl};
 use stargazer_lib::source::twitter::{TwitterActor, TwitterColl, TwitterCtor};
-use stargazer_lib::{ArbiterContext, Config, ScheduleConfig, Server, TwitterConfig, AMQP, InstanceContext};
-use stargazer_lib::scheduler::actor::ScheduleTarget;
-use stargazer_lib::scheduler::messages::ActorsIter;
+use stargazer_lib::{
+    ArbiterContext, Config, InstanceContext, ScheduleConfig, Server, TwitterConfig, AMQP,
+};
 
 #[derive(Clap)]
 #[clap(
@@ -32,10 +34,17 @@ struct Opts {
 
 #[get("/status")]
 async fn status(ctx: web::Data<InstanceContext>) -> impl Responder {
-    let resp = ctx.send(ScheduleTarget::<BililiveActor>::new(), &ActorsIter::new(|map| {
-        let len = map.len();
-        Box::pin(ready(len))
-    })).unwrap().await.unwrap();
+    let resp = ctx
+        .send(
+            ScheduleTarget::<BililiveActor>::new(),
+            &ActorsIter::new(|map| {
+                let len = map.len();
+                Box::pin(ready(len))
+            }),
+        )
+        .unwrap()
+        .await
+        .unwrap();
 
     format!("{:#?}", resp)
 }
