@@ -49,6 +49,8 @@ async fn status(ctx: web::Data<InstanceContext>) -> impl Responder {
     format!("{:#?}", resp)
 }
 
+// TODO blocked by edition 2021
+#[allow(clippy::option_if_let_else)]
 #[actix_web::main]
 async fn main() {
     tracing_subscriber::fmt::init();
@@ -60,6 +62,7 @@ async fn main() {
 
     let source_config = config.source().clone();
     let twitter_config = source_config.twitter().clone();
+    let bililive_config = source_config.bililive();
 
     let db = connect_db(config.mongodb().uri(), config.mongodb().database())
         .await
@@ -74,11 +77,17 @@ async fn main() {
         let collector_config = collector_config.clone();
         let ctx = ArbiterContext::new(instance_id);
 
-        let bililive_actor: ScheduleActor<BililiveActor> = ScheduleActor::builder()
-            .collection(coll_bililive.clone())
-            .ctor_builder(ScheduleConfig::default)
-            .config(sched_config)
-            .build();
+        let bililive_actor: Option<ScheduleActor<BililiveActor>> = if bililive_config.enabled() {
+            Some(
+                ScheduleActor::builder()
+                    .collection(coll_bililive.clone())
+                    .ctor_builder(ScheduleConfig::default)
+                    .config(sched_config)
+                    .build(),
+            )
+        } else {
+            None
+        };
 
         let twitter_actor: Option<ScheduleActor<TwitterActor>> =
             if let TwitterConfig::Enabled { token } = &twitter_config {
@@ -94,12 +103,14 @@ async fn main() {
                 None
             };
 
-        let bililive_addr = bililive_actor.start();
-
+        let bililive_addr = bililive_actor.map(Actor::start);
         let twitter_addr = twitter_actor.map(Actor::start);
 
-        // TODO blocked by edition 2021
-        #[allow(clippy::option_if_let_else)]
+        let ctx = if let Some(addr) = bililive_addr {
+            ctx.register_addr(addr)
+        } else {
+            ctx
+        };
         let ctx = if let Some(addr) = twitter_addr {
             ctx.register_addr(addr)
         } else {
@@ -119,17 +130,13 @@ async fn main() {
         let arc_coll_bililive = arc_coll_bililive.clone();
         let arc_coll_twitter = arc_coll_twitter.clone();
         // register actor addrs
-        (
-            ctx.register_addr(bililive_addr)
-                .register_addr(collector_addr),
-            move |cfg| {
-                cfg.app_data(Data::from(arc_coll_bililive))
-                    .app_data(Data::from(arc_coll_twitter))
-                    .service(status)
-                    .service(web::scope("/bililive").service(stargazer_lib::source::bililive::set))
-                    .service(web::scope("/twitter").service(stargazer_lib::source::twitter::set));
-            },
-        )
+        (ctx.register_addr(collector_addr), move |cfg| {
+            cfg.app_data(Data::from(arc_coll_bililive))
+                .app_data(Data::from(arc_coll_twitter))
+                .service(status)
+                .service(web::scope("/bililive").service(stargazer_lib::source::bililive::set))
+                .service(web::scope("/twitter").service(stargazer_lib::source::twitter::set));
+        })
     })
     .run(config.http().into())
     .unwrap()

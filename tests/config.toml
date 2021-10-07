@@ -15,6 +15,9 @@ database = "stargazer"
 [source.twitter]
 enabled = false
 
+[source.bililive]
+enabled = true
+
 [collector.amqp]
 enabled = true
 uri = "amqp://127.0.0.1"

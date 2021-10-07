@@ -152,14 +152,35 @@ impl Default for Twitter {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
+pub struct Bililive {
+    enabled: bool,
+}
+
+impl Bililive {
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+}
+
+impl Default for Bililive {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
 pub struct Source {
     twitter: Twitter,
+    bililive: Bililive,
 }
 
 impl Source {
     pub const fn twitter(&self) -> &Twitter {
         &self.twitter
+    }
+    pub const fn bililive(&self) -> Bililive {
+        self.bililive
     }
 }
 
