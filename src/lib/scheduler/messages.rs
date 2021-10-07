@@ -68,7 +68,7 @@ where
 }
 
 impl<T> TrySchedule<T> {
-    pub fn new(mode: ScheduleMode) -> Self {
+    pub const fn new(mode: ScheduleMode) -> Self {
         Self(mode, PhantomData)
     }
 }

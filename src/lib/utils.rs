@@ -129,7 +129,7 @@ pub struct CancelOnDrop<T> {
 
 impl<T> CancelOnDrop<T> {
     pub fn new(handle: JoinHandle<T>) -> Self {
-        CancelOnDrop { handle }
+        Self { handle }
     }
 }
 
@@ -143,7 +143,7 @@ impl<T> Deref for CancelOnDrop<T> {
 
 impl<T> Drop for CancelOnDrop<T> {
     fn drop(&mut self) {
-        self.handle.abort()
+        self.handle.abort();
     }
 }
 
@@ -159,7 +159,7 @@ where
     T: FnMut(),
 {
     pub fn new(on_exit: T) -> Self {
-        CustomGuard { on_exit }
+        Self { on_exit }
     }
 }
 
@@ -168,6 +168,6 @@ where
     T: FnMut(),
 {
     fn drop(&mut self) {
-        (self.on_exit)()
+        (self.on_exit)();
     }
 }

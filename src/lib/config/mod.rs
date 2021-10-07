@@ -158,7 +158,7 @@ pub struct Bililive {
 }
 
 impl Bililive {
-    pub fn enabled(&self) -> bool {
+    pub const fn enabled(&self) -> bool {
         self.enabled
     }
 }
@@ -175,7 +175,7 @@ pub struct DebugSource {
 }
 
 impl DebugSource {
-    pub fn enabled(&self) -> bool {
+    pub const fn enabled(&self) -> bool {
         self.enabled
     }
 }

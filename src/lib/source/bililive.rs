@@ -113,7 +113,7 @@ impl Actor for BililiveActor {
                     }
                     Err(e) => {
                         error!("failed to connect stream: {}", e);
-                        ctx.stop()
+                        ctx.stop();
                     }
                 })
                 .actor_instrument(self.span()),
