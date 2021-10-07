@@ -218,6 +218,7 @@ pub struct ScheduleOp<T> {
     update: Document,
     since_ts: i64,
     parent_meta: SchedulerMeta,
+    temporary_acquired: u64,
     __marker: PhantomData<T>,
 }
 
@@ -244,6 +245,7 @@ impl<T> ScheduleOp<T> {
             update,
             since_ts,
             parent_meta,
+            temporary_acquired: 0,
             __marker: PhantomData::default(),
         }
     }
@@ -292,7 +294,7 @@ impl<T> ScheduleOp<T> {
                 .await?;
 
         // allowed entries per worker is [expected, expected+1].
-        let self_count = self.parent_meta.actor_count() as u64;
+        let self_count = self.parent_meta.actor_count() as u64 + self.temporary_acquired;
         let workers_count = workers.len() as u64;
         let expected = entries_count / (workers_count + 1);
         let threshold = if self_count < expected {
@@ -342,16 +344,11 @@ impl<T> ScheduleOp<T> {
     }
 }
 
-#[async_trait]
-impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
-    type Result = Option<(TaskInfo, T)>;
-    type Item = Document;
-
-    fn desc() -> &'static str {
-        "Schedule"
-    }
-
-    async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
+impl<T: DeserializeOwned> ScheduleOp<T> {
+    async fn do_once(
+        &mut self,
+        collection: &Collection<Document>,
+    ) -> DBResult<Option<(TaskInfo, T)>> {
         Ok(match self.mode {
             ScheduleMode::Auto => {
                 if let Some(res) = self.do_acquire(collection).await? {
@@ -363,7 +360,10 @@ impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
                                 warn!("steal conflict, retry");
                                 continue;
                             }
-                            ScheduleResult::Some(res) => break Some(res),
+                            ScheduleResult::Some(res) => {
+                                self.temporary_acquired += 1;
+                                break Some(res);
+                            }
                             ScheduleResult::None => break None,
                         }
                     }
@@ -376,7 +376,10 @@ impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
                         warn!("steal conflict, retry");
                         continue;
                     }
-                    ScheduleResult::Some(res) => break Some(res),
+                    ScheduleResult::Some(res) => {
+                        self.temporary_acquired += 1;
+                        break Some(res);
+                    }
                     ScheduleResult::None => break None,
                 }
             },
@@ -387,5 +390,23 @@ impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
                 bson::from_document(res).unwrap(),
             )
         }))
+    }
+}
+
+#[async_trait]
+impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
+    type Result = Vec<(TaskInfo, T)>;
+    type Item = Document;
+
+    fn desc() -> &'static str {
+        "Schedule"
+    }
+
+    async fn execute_impl(mut self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
+        let mut items = Vec::new();
+        while let Some(item) = self.do_once(collection).await? {
+            items.push(item);
+        }
+        Ok(items)
     }
 }

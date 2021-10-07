@@ -12,7 +12,7 @@ use crate::scheduler::ops::ScheduleMode;
 pub struct TrySchedule<T>(pub(crate) ScheduleMode, PhantomData<T>);
 
 impl<T: Actor> Message for TrySchedule<T> {
-    type Result = DBResult<Option<(Uuid, Addr<T>)>>;
+    type Result = DBResult<Vec<(Uuid, Addr<T>)>>;
 }
 
 /// Update the timestamp.

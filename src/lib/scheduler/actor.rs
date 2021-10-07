@@ -10,6 +10,7 @@ use actix::{
     Actor, ActorFutureExt, Addr, AsyncContext, AtomicResponse, Context, Handler, ResponseFuture,
     WrapFuture,
 };
+use itertools::Itertools;
 use rand::{thread_rng, Rng};
 use serde::Serialize;
 use tracing::{info, info_span, warn};
@@ -114,9 +115,9 @@ where
     T: 'static + Task + Actor<Context = Context<T>> + Unpin,
 {
     #[allow(clippy::type_complexity)]
-    type Result = AtomicResponse<Self, DBResult<Option<(Uuid, Addr<T>)>>>;
+    type Result = AtomicResponse<Self, DBResult<Vec<(Uuid, Addr<T>)>>>;
 
-    fn handle(&mut self, _msg: TrySchedule<T>, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TrySchedule<T>, ctx: &mut Self::Context) -> Self::Result {
         let collection = self.collection.clone();
         let config = self.config;
         let ctor_builder = self.ctor_builder.clone();
@@ -128,38 +129,37 @@ where
 
         AtomicResponse::new(Box::pin(
             async move {
-                ScheduleOp::new(
-                    ScheduleMode::Auto,
-                    T::query(),
-                    ctx_meta,
-                    config.max_interval(),
-                )
-                .execute(&collection)
-                .await
-                .map(|maybe_res| {
-                    maybe_res.map(|(info, entry)| {
-                        // We've got an entry.
-                        let uuid = info.uuid();
-                        info!("entry stolen: {:?}", entry);
-                        let actor = T::construct(
-                            entry,
-                            (*ctor_builder)(),
-                            scheduler_addr,
-                            info,
-                            collection,
-                        );
-                        let addr = actor.start();
-                        (uuid, addr)
+                ScheduleOp::new(msg.0, T::query(), ctx_meta, config.max_interval())
+                    .execute(&collection)
+                    .await
+                    .map(|res| {
+                        res.into_iter()
+                            .map(|(info, entry)| {
+                                // We've got an entry.
+                                let uuid = info.uuid();
+                                info!("entry stolen: {:?}", entry);
+                                let actor = T::construct(
+                                    entry,
+                                    (*ctor_builder)(),
+                                    scheduler_addr.clone(),
+                                    info,
+                                    collection.clone(),
+                                );
+                                let addr = actor.start();
+                                (uuid, addr)
+                            })
+                            .collect_vec()
                     })
-                })
             }
             .into_actor(self)
             .map(|resp, act, _ctx| {
-                resp.map(|maybe_res| {
-                    maybe_res.map(|(uuid, addr)| {
-                        act.ctx.actors.insert(uuid, addr.clone());
-                        (uuid, addr)
-                    })
+                resp.map(|res| {
+                    res.into_iter()
+                        .map(|(uuid, addr)| {
+                            act.ctx.actors.insert(uuid, addr.clone());
+                            (uuid, addr)
+                        })
+                        .collect_vec()
                 })
             })
             .actor_instrument(info_span!("scheduler", id=?scheduler_id)),
@@ -235,6 +235,8 @@ where
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        let mut skip_once = Box::new(true);
+
         // schedule task
         ctx.run_interval(self.config.schedule_interval(), |_, ctx| {
             let delay: u64 = thread_rng().gen_range(0..1000);
@@ -243,10 +245,14 @@ where
                 Duration::from_millis(delay),
             );
         });
-        ctx.run_interval(self.config.balance_interval(), |_, ctx| {
+        ctx.run_interval(self.config.balance_interval(), move |_, ctx| {
+            if *skip_once {
+                *skip_once = false;
+                return;
+            }
             let delay: u64 = thread_rng().gen_range(0..1000);
             ctx.notify_later(
-                TrySchedule::new(ScheduleMode::StealOnly),
+                TrySchedule::new(ScheduleMode::Auto),
                 Duration::from_millis(delay),
             );
         });
