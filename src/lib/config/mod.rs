@@ -169,10 +169,22 @@ impl Default for Bililive {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
+pub struct DebugSource {
+    enabled: bool,
+}
+
+impl DebugSource {
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
 pub struct Source {
     twitter: Twitter,
     bililive: Bililive,
+    debug: DebugSource,
 }
 
 impl Source {
@@ -181,6 +193,9 @@ impl Source {
     }
     pub const fn bililive(&self) -> Bililive {
         self.bililive
+    }
+    pub const fn debug(&self) -> DebugSource {
+        self.debug
     }
 }
 

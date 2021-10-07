@@ -15,6 +15,7 @@ use stargazer_lib::scheduler::actor::ScheduleTarget;
 use stargazer_lib::scheduler::messages::ActorsIter;
 use stargazer_lib::scheduler::ScheduleActor;
 use stargazer_lib::source::bililive::{BililiveActor, BililiveColl};
+use stargazer_lib::source::debug::{DebugActor, DebugColl};
 use stargazer_lib::source::twitter::{TwitterActor, TwitterColl, TwitterCtor};
 use stargazer_lib::{
     ArbiterContext, Config, InstanceContext, ScheduleConfig, Server, TwitterConfig, AMQP,
@@ -36,7 +37,7 @@ struct Opts {
 async fn status(ctx: web::Data<InstanceContext>) -> impl Responder {
     let resp = ctx
         .send(
-            ScheduleTarget::<BililiveActor>::new(),
+            ScheduleTarget::<DebugActor>::new(),
             &ActorsIter::new(|map| {
                 let len = map.len();
                 Box::pin(ready(len))
@@ -63,15 +64,18 @@ async fn main() {
     let source_config = config.source().clone();
     let twitter_config = source_config.twitter().clone();
     let bililive_config = source_config.bililive();
+    let debug_source_config = source_config.debug();
 
     let db = connect_db(config.mongodb().uri(), config.mongodb().database())
         .await
         .expect("unable to connect to db");
     let coll_bililive: Collection<Document> = db.collection("bililive");
     let coll_twitter: Collection<Document> = db.collection("twitter");
+    let coll_debug: Collection<Document> = db.collection("debug");
 
     let arc_coll_bililive: Arc<Coll<BililiveColl>> = Arc::new(Coll::new(coll_bililive.clone()));
     let arc_coll_twitter: Arc<Coll<TwitterColl>> = Arc::new(Coll::new(coll_twitter.clone()));
+    let arc_coll_debug: Arc<Coll<DebugColl>> = Arc::new(Coll::new(coll_debug.clone()));
 
     Server::new(move |instance_id| {
         let collector_config = collector_config.clone();
@@ -103,8 +107,21 @@ async fn main() {
                 None
             };
 
+        let debug_actor: Option<ScheduleActor<DebugActor>> = if debug_source_config.enabled() {
+            Some(
+                ScheduleActor::builder()
+                    .collection(coll_debug.clone())
+                    .ctor_builder(ScheduleConfig::default)
+                    .config(sched_config)
+                    .build(),
+            )
+        } else {
+            None
+        };
+
         let bililive_addr = bililive_actor.map(Actor::start);
         let twitter_addr = twitter_actor.map(Actor::start);
+        let debug_addr = debug_actor.map(Actor::start);
 
         let ctx = if let Some(addr) = bililive_addr {
             ctx.register_addr(addr)
@@ -112,6 +129,11 @@ async fn main() {
             ctx
         };
         let ctx = if let Some(addr) = twitter_addr {
+            ctx.register_addr(addr)
+        } else {
+            ctx
+        };
+        let ctx = if let Some(addr) = debug_addr {
             ctx.register_addr(addr)
         } else {
             ctx
@@ -129,13 +151,16 @@ async fn main() {
 
         let arc_coll_bililive = arc_coll_bililive.clone();
         let arc_coll_twitter = arc_coll_twitter.clone();
+        let arc_coll_debug = arc_coll_debug.clone();
         // register actor addrs
         (ctx.register_addr(collector_addr), move |cfg| {
             cfg.app_data(Data::from(arc_coll_bililive))
                 .app_data(Data::from(arc_coll_twitter))
+                .app_data(Data::from(arc_coll_debug))
                 .service(status)
                 .service(web::scope("/bililive").service(stargazer_lib::source::bililive::set))
-                .service(web::scope("/twitter").service(stargazer_lib::source::twitter::set));
+                .service(web::scope("/twitter").service(stargazer_lib::source::twitter::set))
+                .service(web::scope("/debug").service(stargazer_lib::source::debug::set));
         })
     })
     .run(config.http().into())

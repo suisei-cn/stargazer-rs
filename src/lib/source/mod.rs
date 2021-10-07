@@ -2,6 +2,7 @@ use actix::Message;
 use serde::Serialize;
 
 pub mod bililive;
+pub mod debug;
 pub mod twitter;
 
 #[derive(Debug, Clone, Message)]
