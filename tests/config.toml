@@ -27,4 +27,3 @@ uri = "amqp://127.0.0.1"
 exchange = "stargazer"
 
 [collector.debug]
-enabled = true
