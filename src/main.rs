@@ -6,6 +6,7 @@ use actix::Actor;
 use actix_web::web::Data;
 use actix_web::{get, web, Responder};
 use clap::{AppSettings, Clap};
+use itertools::Itertools;
 
 use stargazer_lib::collector::amqp::AMQPFactory;
 use stargazer_lib::collector::debug::DebugCollectorFactory;
@@ -45,7 +46,11 @@ async fn status(ctx: web::Data<InstanceContext>) -> impl Responder {
         )
         .unwrap()
         .await
-        .unwrap();
+        .unwrap()
+        .into_iter()
+        .sorted_by_key(|i| i.0)
+        .map(|(k, v)| format!("{}: {}", k, v))
+        .collect_vec();
 
     format!("{:#?}", resp)
 }
