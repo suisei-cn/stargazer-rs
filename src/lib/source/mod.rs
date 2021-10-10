@@ -8,8 +8,8 @@ pub mod twitter;
 #[derive(Debug, Clone, Message)]
 #[rtype("()")]
 pub struct ToCollector<T: Serialize> {
-    topic: String,
-    body: T,
+    pub(crate) topic: String,
+    pub(crate) body: T,
 }
 
 impl<T: Serialize> ToCollector<T> {

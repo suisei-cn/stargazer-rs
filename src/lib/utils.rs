@@ -19,48 +19,73 @@ impl<T> TypeEq for T {
 #[macro_export]
 /// impl_message_target!((pub) ActorTarget, Actor)
 macro_rules! impl_message_target {
-    ($name: ident, $target_ty: ty) => {
-        #[derive(Debug, Copy, Clone)]
-        struct $name;
-        impl $crate::context::MessageTarget for $name {
-            type Actor = $target_ty;
-            type Addr = actix::Addr<$target_ty>;
-        }
+    ( $target: ident, $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)? ) => {
+        #[derive(Debug)]
+        struct $target $(< $( $lt ),+ >)? $(($(core::marker::PhantomData<$lt>),+))?;
+
+        impl_message_target!(impl $target, $name $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)?);
     };
-    (pub $name: ident, $target_ty: ty) => {
-        #[derive(Debug, Copy, Clone)]
-        pub struct $name;
-        impl $crate::context::MessageTarget for $name {
-            type Actor = $target_ty;
-            type Addr = actix::Addr<$target_ty>;
-        }
+    ( pub $target: ident, $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)? ) => {
+        #[derive(Debug)]
+        pub struct $target $(< $( $lt ),+ >)? $(($(core::marker::PhantomData<$lt>),+))?;
+
+        impl_message_target!(impl $target, $name $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)?);
     };
+    ( impl $target: ident, $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)? ) => {
+        $(
+        #[allow(dead_code)]
+        impl <$($lt),+> $target < $( $lt ),+ > {
+            pub fn new() -> Self {
+                Default::default()
+            }
+        })?
+
+        impl $(<$($lt),+>)? Default for $target $(< $( $lt ),+ >)? {
+            fn default() -> Self {
+                Self$(($( core::marker::PhantomData::<$lt> ),+))?
+            }
+        }
+
+        impl $(<$($lt),+>)? Clone for $target $(< $( $lt ),+ >)? {
+            fn clone(&self) -> Self {
+                Self$(($( core::marker::PhantomData::<$lt> ),+))?
+            }
+        }
+        impl $(<$($lt),+>)? Copy for $target $(< $( $lt ),+ >)? {}
+        unsafe impl $(<$($lt),+>)? Send for $target $(< $( $lt ),+ >)? {}
+
+        impl $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $crate::context::MessageTarget for $target $(< $( $lt ),+ >)?
+        {
+            type Actor = $name $(< $( $lt ),+ >)?;
+            type Addr = actix::Addr<$name $(< $( $lt ),+ >)?>;
+        }
+    }
 }
 
 #[macro_export]
 /// impl_stop_on_panic!(Actor)
 macro_rules! impl_stop_on_panic {
-    ($name: ident) => {
-        impl Drop for $name {
+    ( $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)? ) => {
+        impl $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? Drop for $name $(< $( $lt ),+ >)? {
             fn drop(&mut self) {
                 if std::thread::panicking() {
                     crate::KillerActor::kill(true)
                 }
             }
         }
-    };
+    }
 }
 
 #[macro_export]
 /// impl_task_field_getter!(Actor, scheduler)
 macro_rules! impl_task_field_getter {
-    ($self: ident, $info: ident, $scheduler: ident) => {
-        impl $crate::scheduler::InfoGetter for $self {
+    ($self: ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)?, $info: ident, $scheduler: ident) => {
+        impl $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $crate::scheduler::InfoGetter for $self $(< $( $lt ),+ >)? {
             fn get_info(&self) -> $crate::scheduler::TaskInfo {
                 self.$info
             }
         }
-        impl $crate::scheduler::SchedulerGetter for $self {
+        impl $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $crate::scheduler::SchedulerGetter for $self $(< $( $lt ),+ >)? {
             fn get_scheduler(&self) -> &actix::Addr<$crate::scheduler::actor::ScheduleActor<Self>> {
                 &self.$scheduler
             }
@@ -70,18 +95,19 @@ macro_rules! impl_task_field_getter {
 
 #[macro_export]
 macro_rules! impl_to_collector_handler {
-    ($Self: ident) => {
-        impl<T: 'static + serde::Serialize + Send + Sync>
-            actix::Handler<crate::source::ToCollector<T>> for $Self
+    ($Self: ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)?) => {
+        impl<$($( $lt $( : $clt $(+ $dlt )* )? ),+ , )? Z: 'static + serde::Serialize + Send + Sync >
+            actix::Handler<crate::source::ToCollector<Z>> for $Self $(< $( $lt ),+ >)?
         {
             type Result = actix::ResponseActFuture<Self, ()>;
 
             fn handle(
                 &mut self,
-                msg: crate::source::ToCollector<T>,
+                msg: crate::source::ToCollector<Z>,
                 _ctx: &mut Self::Context,
             ) -> Self::Result {
                 use actix::ActorFutureExt;
+                use actix::ActorContext;
                 use actix::WrapFuture;
                 use tracing_actix::ActorInstrument;
 
