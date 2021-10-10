@@ -1,15 +1,11 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::time::Duration;
 
 use actix::{
-    Actor, ActorFutureExt, Addr, AsyncContext, AtomicResponse, Context, Handler, ResponseFuture,
-    WrapFuture,
+    Actor, ActorFutureExt, Addr, AsyncContext, AtomicResponse, Context, Handler, ResponseActFuture,
+    ResponseFuture, WrapFuture,
 };
-use rand::{thread_rng, Rng};
 use serde::Serialize;
 use tracing::{info, info_span, warn};
 use tracing_actix::ActorInstrument;
@@ -19,6 +15,7 @@ use uuid::Uuid;
 use crate::common::ResponseWrapper;
 use crate::config::ScheduleConfig;
 use crate::db::{Collection, DBOperation, DBResult, Document};
+use crate::scheduler::driver::{RegisterScheduler, ScheduleDriverActor};
 use crate::scheduler::messages::UpdateEntry;
 use crate::scheduler::ops::{ScheduleMode, UpdateEntryOp};
 
@@ -65,6 +62,7 @@ where
     pub(crate) config: ScheduleConfig,
     #[builder(default, setter(skip))]
     pub(crate) ctx: ScheduleContext<T>,
+    pub(crate) driver: Addr<ScheduleDriverActor<T>>,
 }
 
 impl_message_target!(pub ScheduleTarget, ScheduleActor<T: Task>);
@@ -80,6 +78,7 @@ impl<T: Task> Debug for ScheduleActor<T> {
     }
 }
 
+// TODO no UpdateEntry Before TrySchedule cause task jitter
 impl<T> Handler<TrySchedule<T>> for ScheduleActor<T>
 where
     T: 'static + Task + Actor<Context = Context<T>> + Unpin,
@@ -189,13 +188,18 @@ where
 impl<A, F, Output> Handler<ActorsIter<A, F, Output>> for ScheduleActor<A>
 where
     A: 'static + Task + Actor<Context = Context<A>> + Unpin,
-    F: FnOnce(HashMap<Uuid, Addr<A>>) -> Pin<Box<dyn Future<Output = Output>>>,
+    F: 'static + FnOnce(HashMap<Uuid, Addr<A>>) -> ResponseFuture<Output>,
     Output: 'static,
 {
-    type Result = ResponseFuture<Output>;
+    type Result = ResponseActFuture<Self, Output>;
 
-    fn handle(&mut self, msg: ActorsIter<A, F, Output>, _ctx: &mut Self::Context) -> Self::Result {
-        (msg.into_inner())(self.ctx.actors.clone())
+    fn handle(&mut self, msg: ActorsIter<A, F, Output>, ctx: &mut Self::Context) -> Self::Result {
+        Box::pin(
+            ctx.address()
+                .send(TriggerGC)
+                .into_actor(self)
+                .then(|_, act, _ctx| (msg.into_inner())(act.ctx.actors.clone()).into_actor(act)),
+        )
     }
 }
 
@@ -206,23 +210,7 @@ where
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        // schedule task
-        ctx.run_interval(self.config.schedule_interval(), |_, ctx| {
-            let delay: u64 = thread_rng().gen_range(0..1000);
-            ctx.notify_later(
-                TrySchedule::new(ScheduleMode::OutdatedOnly),
-                Duration::from_millis(delay),
-            );
-        });
-        ctx.run_interval(self.config.balance_interval(), |_, ctx| {
-            let delay: u64 = thread_rng().gen_range(0..1000);
-            ctx.notify_later(
-                TrySchedule::new(ScheduleMode::StealOnly),
-                Duration::from_millis(delay),
-            );
-        });
-
-        // gc task
+        self.driver.do_send(RegisterScheduler::new(ctx.address()));
         ctx.run_interval(self.config.max_interval() / 2, |_, ctx| {
             ctx.notify(TriggerGC);
         });

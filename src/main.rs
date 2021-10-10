@@ -13,6 +13,7 @@ use stargazer_lib::collector::debug::DebugCollectorFactory;
 use stargazer_lib::collector::CollectorActor;
 use stargazer_lib::db::{connect_db, Coll, Collection, Document};
 use stargazer_lib::scheduler::actor::ScheduleTarget;
+use stargazer_lib::scheduler::driver::ScheduleDriverActor;
 use stargazer_lib::scheduler::messages::ActorsIter;
 use stargazer_lib::scheduler::ScheduleActor;
 use stargazer_lib::source::bililive::{BililiveActor, BililiveColl};
@@ -39,10 +40,7 @@ async fn status(ctx: web::Data<InstanceContext>) -> impl Responder {
     let resp = ctx
         .send(
             ScheduleTarget::<DebugActor>::new(),
-            &ActorsIter::new(|map| {
-                let len = map.len();
-                Box::pin(ready(len))
-            }),
+            &ActorsIter::new(|map| Box::pin(ready(map.len()))),
         )
         .unwrap()
         .await
@@ -82,6 +80,9 @@ async fn main() {
     let arc_coll_twitter: Arc<Coll<TwitterColl>> = Arc::new(Coll::new(coll_twitter.clone()));
     let arc_coll_debug: Arc<Coll<DebugColl>> = Arc::new(Coll::new(coll_debug.clone()));
 
+    let bililive_driver = ScheduleDriverActor::new(sched_config).start();
+    let twitter_driver = ScheduleDriverActor::new(sched_config).start();
+    let debug_driver = ScheduleDriverActor::new(sched_config).start();
     Server::new(move |instance_id| {
         let collector_config = collector_config.clone();
         let ctx = ArbiterContext::new(instance_id);
@@ -92,6 +93,7 @@ async fn main() {
                     .collection(coll_bililive.clone())
                     .ctor_builder(ScheduleConfig::default)
                     .config(sched_config)
+                    .driver(bililive_driver.clone())
                     .build(),
             )
         } else {
@@ -106,6 +108,7 @@ async fn main() {
                         .collection(coll_twitter.clone())
                         .ctor_builder(move || TwitterCtor::new(sched_config, &*token))
                         .config(sched_config)
+                        .driver(twitter_driver.clone())
                         .build(),
                 )
             } else {
@@ -118,6 +121,7 @@ async fn main() {
                     .collection(coll_debug.clone())
                     .ctor_builder(ScheduleConfig::default)
                     .config(sched_config)
+                    .driver(debug_driver.clone())
                     .build(),
             )
         } else {

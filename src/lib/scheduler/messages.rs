@@ -11,6 +11,8 @@ use crate::scheduler::ops::ScheduleMode;
 #[derive(Debug, Copy, Clone)]
 pub struct TrySchedule<T>(pub(crate) ScheduleMode, PhantomData<T>);
 
+unsafe impl<T> Send for TrySchedule<T> {}
+
 impl<T: Actor> Message for TrySchedule<T> {
     type Result = DBResult<Option<(Uuid, Addr<T>)>>;
 }
