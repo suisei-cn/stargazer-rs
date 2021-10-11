@@ -41,6 +41,24 @@ impl UpdateEntry<()> {
 }
 
 #[derive(Debug, Copy, Clone, Message)]
+#[rtype("()")]
+pub struct UpdateAll {
+    evict: bool,
+}
+
+impl UpdateAll {
+    pub const fn evict(&self) -> bool {
+        self.evict
+    }
+}
+
+impl UpdateAll {
+    pub const fn new(evict: bool) -> Self {
+        Self { evict }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Message)]
 #[rtype("uuid::Uuid")]
 pub struct GetId;
 

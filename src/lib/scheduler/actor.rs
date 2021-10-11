@@ -6,6 +6,9 @@ use actix::{
     Actor, ActorFutureExt, Addr, AsyncContext, AtomicResponse, Context, Handler, ResponseActFuture,
     ResponseFuture, WrapFuture,
 };
+use actix_signal::{AddrSignalExt, SignalHandler};
+use futures::FutureExt;
+use itertools::Itertools;
 use serde::Serialize;
 use tracing::{info, info_span, warn};
 use tracing_actix::ActorInstrument;
@@ -16,7 +19,7 @@ use crate::common::ResponseWrapper;
 use crate::config::ScheduleConfig;
 use crate::db::{Collection, DBOperation, DBResult, Document};
 use crate::scheduler::driver::{RegisterScheduler, ScheduleDriverActor};
-use crate::scheduler::messages::UpdateEntry;
+use crate::scheduler::messages::{UpdateAll, UpdateEntry};
 use crate::scheduler::ops::{ScheduleMode, UpdateEntryOp};
 use crate::scheduler::TaskInfo;
 
@@ -26,12 +29,12 @@ use super::ops::ScheduleOp;
 use super::Task;
 
 #[derive(Debug, Clone)]
-pub struct ScheduleContext<T: Actor> {
+pub struct ScheduleContext<T: Actor + SignalHandler> {
     id: Uuid,
     actors: HashMap<TaskInfo, Addr<T>>,
 }
 
-impl<T: Actor> ScheduleContext<T> {
+impl<T: Actor + SignalHandler> ScheduleContext<T> {
     pub fn new() -> Self {
         Default::default()
     }
@@ -43,7 +46,7 @@ impl<T: Actor> ScheduleContext<T> {
     }
 }
 
-impl<T: Actor> Default for ScheduleContext<T> {
+impl<T: Actor + SignalHandler> Default for ScheduleContext<T> {
     fn default() -> Self {
         Self {
             id: Uuid::new_v4(),
@@ -81,7 +84,7 @@ impl<T: Task> Debug for ScheduleActor<T> {
 
 impl<T> Handler<TrySchedule<T>> for ScheduleActor<T>
 where
-    T: 'static + Task + Actor<Context = Context<T>> + Unpin,
+    T: 'static + Task + Unpin,
 {
     #[allow(clippy::type_complexity)]
     type Result = AtomicResponse<Self, DBResult<Option<(TaskInfo, Addr<T>)>>>;
@@ -138,7 +141,7 @@ where
 
 impl<T, U> Handler<UpdateEntry<U>> for ScheduleActor<T>
 where
-    T: 'static + Task + Actor<Context = Context<T>> + Unpin,
+    T: 'static + Task + Unpin,
     U: 'static + Serialize + Send,
 {
     type Result = AtomicResponse<Self, DBResult<bool>>;
@@ -152,9 +155,41 @@ where
     }
 }
 
+impl<T> Handler<UpdateAll> for ScheduleActor<T>
+where
+    T: 'static + Task + Unpin,
+{
+    type Result = ResponseActFuture<Self, ()>;
+
+    fn handle(&mut self, msg: UpdateAll, _ctx: &mut Self::Context) -> Self::Result {
+        let collection = self.collection.clone();
+        let entries = self
+            .ctx
+            .actors
+            .iter()
+            .map(|(info, addr)| (UpdateEntryOp::<()>::new(*info, None), addr.clone()))
+            .map(move |(op, addr)| {
+                let collection = collection.clone();
+                async move {
+                    let succ = op.execute(&collection).await.unwrap_or(false);
+                    if !succ && msg.evict() {
+                        addr.stop();
+                    }
+                }
+            })
+            .collect_vec();
+        let futs = futures::future::join_all(entries);
+        Box::pin(
+            futs.map(|_| ())
+                .into_actor(self)
+                .actor_instrument(info_span!("update_all", evict = msg.evict())),
+        )
+    }
+}
+
 impl<T> Handler<GetId> for ScheduleActor<T>
 where
-    T: 'static + Task + Actor<Context = Context<T>> + Unpin,
+    T: 'static + Task + Unpin,
 {
     type Result = ResponseWrapper<Uuid>;
 
@@ -165,7 +200,7 @@ where
 
 impl<T> Handler<TriggerGC> for ScheduleActor<T>
 where
-    T: 'static + Task + Actor<Context = Context<T>> + Unpin,
+    T: 'static + Task + Unpin,
 {
     type Result = ();
 
@@ -186,7 +221,7 @@ where
 
 impl<A, F, Output> Handler<ActorsIter<A, F, Output>> for ScheduleActor<A>
 where
-    A: 'static + Task + Actor<Context = Context<A>> + Unpin,
+    A: 'static + Task + Unpin,
     F: 'static + FnOnce(HashMap<TaskInfo, Addr<A>>) -> ResponseFuture<Output>,
     Output: 'static,
 {
@@ -204,7 +239,7 @@ where
 
 impl<T> Actor for ScheduleActor<T>
 where
-    T: 'static + Task + Actor<Context = Context<T>> + Unpin,
+    T: 'static + Task + Unpin,
 {
     type Context = Context<Self>;
 

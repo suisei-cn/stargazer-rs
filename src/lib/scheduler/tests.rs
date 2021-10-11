@@ -1,6 +1,7 @@
 use std::mem::MaybeUninit;
 
 use actix::{Actor, Context};
+use actix_signal::SignalHandler;
 use tracing::{info_span, Span};
 
 use crate::db::{Collection, Document};
@@ -9,7 +10,7 @@ use crate::utils::Scheduler;
 
 use super::models::TaskInfo;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, SignalHandler)]
 struct DummyTask {
     info: TaskInfo,
     collection: Collection<Document>,

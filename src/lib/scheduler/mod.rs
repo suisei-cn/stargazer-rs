@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use actix::{Actor, Context};
+use actix_signal::SignalHandler;
 use serde::{de::DeserializeOwned, Serialize};
 use tracing::Span;
 
@@ -32,7 +33,7 @@ pub trait TaskFieldGetter: SchedulerGetter + InfoGetter {}
 
 impl<T> TaskFieldGetter for T where T: SchedulerGetter + InfoGetter {}
 
-pub trait Task: TaskFieldGetter + Actor<Context = Context<Self>> + Debug {
+pub trait Task: TaskFieldGetter + Actor<Context = Context<Self>> + SignalHandler + Debug {
     type Entry: Debug + Serialize + DeserializeOwned + Send + Sync;
     type Ctor;
     fn query() -> Document;

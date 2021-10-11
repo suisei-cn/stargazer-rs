@@ -123,6 +123,7 @@ mod utils {
     use std::rc::Rc;
 
     use actix::{Actor, Context};
+    use actix_signal::SignalHandler;
     use tracing::Span;
 
     use crate::db::{Collection, Document};
@@ -131,6 +132,7 @@ mod utils {
 
     pub trait StaticUnpinned: 'static + Unpin {}
 
+    #[derive(SignalHandler)]
     pub struct A<T: StaticUnpinned, U: StaticUnpinned + Copy + Eq> {
         _marker_1: PhantomData<(T, U)>,
         _marker_2: Rc<()>,

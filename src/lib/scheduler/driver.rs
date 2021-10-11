@@ -38,7 +38,7 @@ pub struct RegisterScheduler<T: Task>(Addr<ScheduleActor<T>>);
 
 impl<T: Task> RegisterScheduler<T> {
     pub fn new(addr: Addr<ScheduleActor<T>>) -> Self {
-        RegisterScheduler(addr)
+        Self(addr)
     }
 }
 
@@ -117,6 +117,6 @@ where
     type Result = ();
 
     fn handle(&mut self, msg: RegisterScheduler<T>, _ctx: &mut Self::Context) -> Self::Result {
-        self.addrs.push(msg.0)
+        self.addrs.push(msg.0);
     }
 }

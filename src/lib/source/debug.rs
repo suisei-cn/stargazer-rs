@@ -1,4 +1,5 @@
 use actix::{Actor, ActorContext, ActorFutureExt, AsyncContext, Context, WrapFuture};
+use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
@@ -16,7 +17,7 @@ pub struct DebugEntry {
     id: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, SignalHandler)]
 pub struct DebugActor {
     entry: DebugEntry,
     schedule_config: ScheduleConfig,

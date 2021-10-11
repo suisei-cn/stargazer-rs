@@ -2,6 +2,7 @@ use actix::fut::ready;
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Context, ResponseActFuture, WrapFuture,
 };
+use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
 use egg_mode::entities::MediaType;
 use egg_mode::error::Result;
@@ -39,7 +40,7 @@ pub struct Tweet {
     is_rt: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, SignalHandler)]
 pub struct TwitterActor {
     token: Token,
     entry: TwitterEntry,

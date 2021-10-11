@@ -1,4 +1,5 @@
 use actix::Actor;
+use actix_signal::SignalHandler;
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -47,7 +48,7 @@ impl SchedulerMeta {
     }
 }
 
-impl<T: Actor> From<&ScheduleContext<T>> for SchedulerMeta {
+impl<T: Actor + SignalHandler> From<&ScheduleContext<T>> for SchedulerMeta {
     fn from(ctx: &ScheduleContext<T>) -> Self {
         Self {
             id: ctx.id(),

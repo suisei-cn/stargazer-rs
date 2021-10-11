@@ -4,6 +4,7 @@ use actix::fut::ready;
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Context, StreamHandler, WrapFuture,
 };
+use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
 use bililive::connect::tokio::connect_with_retry;
 use bililive::{BililiveError, ConfigBuilder, Packet, RetryConfig};
@@ -30,7 +31,7 @@ impl BililiveEntry {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, SignalHandler)]
 pub struct BililiveActor {
     uid: u64,
     schedule_config: ScheduleConfig,

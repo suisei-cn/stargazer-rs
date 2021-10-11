@@ -46,6 +46,7 @@ macro_rules! impl_message_target {
             }
         }
 
+        #[allow(clippy::expl_impl_clone_on_copy)]
         impl $(<$($lt),+>)? Clone for $target $(< $( $lt ),+ >)? {
             fn clone(&self) -> Self {
                 Self$(($( core::marker::PhantomData::<$lt> ),+))?

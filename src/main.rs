@@ -14,7 +14,7 @@ use stargazer_lib::collector::CollectorActor;
 use stargazer_lib::db::{connect_db, Coll, Collection, Document};
 use stargazer_lib::scheduler::actor::ScheduleTarget;
 use stargazer_lib::scheduler::driver::ScheduleDriverActor;
-use stargazer_lib::scheduler::messages::ActorsIter;
+use stargazer_lib::scheduler::messages::{ActorsIter, UpdateAll};
 use stargazer_lib::scheduler::ScheduleActor;
 use stargazer_lib::source::bililive::{BililiveActor, BililiveColl};
 use stargazer_lib::source::debug::{DebugActor, DebugColl};
@@ -37,6 +37,12 @@ struct Opts {
 
 #[get("/status")]
 async fn status(ctx: web::Data<InstanceContext>) -> impl Responder {
+    // evict outdated tasks
+    ctx.send(ScheduleTarget::<DebugActor>::new(), &UpdateAll::new(true))
+        .unwrap()
+        .await
+        .unwrap();
+
     let resp = ctx
         .send(
             ScheduleTarget::<DebugActor>::new(),
