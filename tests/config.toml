@@ -22,7 +22,7 @@ enabled = false
 enabled = true
 
 [source.debug]
-enabled = true
+enabled = false
 
 [collector.amqp]
 enabled = true

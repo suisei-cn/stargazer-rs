@@ -38,14 +38,17 @@ struct Opts {
 #[get("/status")]
 async fn status(ctx: web::Data<InstanceContext>) -> impl Responder {
     // evict outdated tasks
-    ctx.send(ScheduleTarget::<DebugActor>::new(), &UpdateAll::new(true))
-        .unwrap()
-        .await
-        .unwrap();
+    ctx.send(
+        ScheduleTarget::<BililiveActor>::new(),
+        &UpdateAll::new(true),
+    )
+    .unwrap()
+    .await
+    .unwrap();
 
     let resp = ctx
         .send(
-            ScheduleTarget::<DebugActor>::new(),
+            ScheduleTarget::<BililiveActor>::new(),
             &ActorsIter::new(|map| Box::pin(ready(map.len()))),
         )
         .unwrap()
@@ -178,6 +181,7 @@ async fn main() {
                 .service(web::scope("/debug").service(stargazer_lib::source::debug::set));
         })
     })
+    .workers(config.basic().workers())
     .run(config.http().into())
     .unwrap()
     .await
