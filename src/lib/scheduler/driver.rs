@@ -6,7 +6,7 @@ use rand::{thread_rng, Rng};
 use tracing::info_span;
 use tracing_actix::ActorInstrument;
 
-use crate::scheduler::messages::TrySchedule;
+use crate::scheduler::messages::{TrySchedule, UpdateAll};
 use crate::scheduler::ops::ScheduleMode;
 use crate::scheduler::{ScheduleActor, Task};
 use crate::ScheduleConfig;
@@ -99,6 +99,11 @@ where
 {
     let mut new_addrs = vec![];
     for addr in addrs {
+        if mode != ScheduleMode::OutdatedOnly {
+            addr.send(UpdateAll::new(true))
+                .await
+                .expect("unable to send msg to scheduler");
+        }
         let resp = addr
             .send(TrySchedule::new(mode))
             .await
