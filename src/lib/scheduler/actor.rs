@@ -79,7 +79,6 @@ impl<T: Task> Debug for ScheduleActor<T> {
     }
 }
 
-// TODO no UpdateEntry Before TrySchedule cause task jitter
 impl<T> Handler<TrySchedule<T>> for ScheduleActor<T>
 where
     T: 'static + Task + Actor<Context = Context<T>> + Unpin,

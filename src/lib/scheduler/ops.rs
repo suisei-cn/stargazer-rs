@@ -327,7 +327,9 @@ impl<T> ScheduleOp<T> {
                     .find_one_and_update(
                         bson::to_document(victim_task).unwrap(),
                         self.update.clone(),
-                        None,
+                        FindOneAndUpdateOptions::builder()
+                            .return_document(ReturnDocument::After)
+                            .build(),
                     )
                     .await?
                     .map_or(ScheduleResult::Conflict, ScheduleResult::Some)
