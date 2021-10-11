@@ -1,3 +1,6 @@
+[basic]
+workers = 0
+
 [http]
 enabled = true
 host = "127.0.0.1"

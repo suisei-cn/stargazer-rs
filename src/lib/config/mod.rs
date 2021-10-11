@@ -22,6 +22,7 @@ pub type TwitterConfig = Twitter;
 /// Contains all configuration to run the application.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
 pub struct Config {
+    basic: Basic,
     http: HTTP,
     schedule: Schedule,
     mongodb: MongoDB,
@@ -30,6 +31,9 @@ pub struct Config {
 }
 
 impl Config {
+    pub const fn basic(&self) -> Basic {
+        self.basic
+    }
     pub const fn http(&self) -> HTTP {
         self.http
     }
@@ -44,6 +48,28 @@ impl Config {
     }
     pub const fn source(&self) -> &Source {
         &self.source
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
+pub struct Basic {
+    /// Workers on instance. Non-set or zero value set the value to count of available logical cpu cores.
+    #[serde(deserialize_with = "to_maybe_non_zero")]
+    workers: Option<usize>,
+}
+
+fn to_maybe_non_zero<'de, D>(deserializer: D) -> Result<Option<usize>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let num: Option<usize> = Deserialize::deserialize(deserializer)?;
+
+    num.map_or(Ok(None), |num| Ok(if num == 0 { None } else { Some(num) }))
+}
+
+impl Basic {
+    pub const fn workers(&self) -> Option<usize> {
+        self.workers
     }
 }
 

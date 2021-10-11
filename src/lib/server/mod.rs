@@ -101,8 +101,8 @@ where
     /// Set number of workers to start.
     ///
     /// By default, server uses number of available logical CPU as thread count.
-    pub fn workers(mut self, num: usize) -> Self {
-        self.workers = num;
+    pub fn workers(mut self, num: impl Into<Option<usize>>) -> Self {
+        self.workers = num.into().map_or_else(num_cpus::get, |num| num);
         self
     }
 }
