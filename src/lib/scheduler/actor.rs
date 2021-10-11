@@ -18,6 +18,7 @@ use crate::db::{Collection, DBOperation, DBResult, Document};
 use crate::scheduler::driver::{RegisterScheduler, ScheduleDriverActor};
 use crate::scheduler::messages::UpdateEntry;
 use crate::scheduler::ops::{ScheduleMode, UpdateEntryOp};
+use crate::scheduler::TaskInfo;
 
 use super::messages::{ActorsIter, GetId, TriggerGC, TrySchedule};
 use super::models::SchedulerMeta;
@@ -27,7 +28,7 @@ use super::Task;
 #[derive(Debug, Clone)]
 pub struct ScheduleContext<T: Actor> {
     id: Uuid,
-    actors: HashMap<Uuid, Addr<T>>,
+    actors: HashMap<TaskInfo, Addr<T>>,
 }
 
 impl<T: Actor> ScheduleContext<T> {
@@ -37,7 +38,7 @@ impl<T: Actor> ScheduleContext<T> {
     pub fn id(&self) -> Uuid {
         self.id
     }
-    pub fn actors(&self) -> &HashMap<Uuid, Addr<T>> {
+    pub fn actors(&self) -> &HashMap<TaskInfo, Addr<T>> {
         &self.actors
     }
 }
@@ -84,7 +85,7 @@ where
     T: 'static + Task + Actor<Context = Context<T>> + Unpin,
 {
     #[allow(clippy::type_complexity)]
-    type Result = AtomicResponse<Self, DBResult<Option<(Uuid, Addr<T>)>>>;
+    type Result = AtomicResponse<Self, DBResult<Option<(TaskInfo, Addr<T>)>>>;
 
     fn handle(&mut self, _msg: TrySchedule<T>, ctx: &mut Self::Context) -> Self::Result {
         let collection = self.collection.clone();
@@ -109,7 +110,6 @@ where
                 .map(|maybe_res| {
                     maybe_res.map(|(info, entry)| {
                         // We've got an entry.
-                        let uuid = info.uuid();
                         info!("entry stolen: {:?}", entry);
                         let actor = T::construct(
                             entry,
@@ -119,16 +119,16 @@ where
                             collection,
                         );
                         let addr = actor.start();
-                        (uuid, addr)
+                        (info, addr)
                     })
                 })
             }
             .into_actor(self)
             .map(|resp, act, _ctx| {
                 resp.map(|maybe_res| {
-                    maybe_res.map(|(uuid, addr)| {
-                        act.ctx.actors.insert(uuid, addr.clone());
-                        (uuid, addr)
+                    maybe_res.map(|(info, addr)| {
+                        act.ctx.actors.insert(info, addr.clone());
+                        (info, addr)
                     })
                 })
             })
@@ -175,12 +175,12 @@ where
         self.ctx
             .actors
             .iter()
-            .filter_map(|(uuid, addr)| (!addr.connected()).then(|| *uuid))
+            .filter_map(|(info, addr)| (!addr.connected()).then(|| *info))
             .collect::<Vec<_>>()
             .into_iter()
-            .for_each(|uuid| {
-                warn!("Removing {} from actors", uuid);
-                self.ctx.actors.remove(&uuid);
+            .for_each(|info| {
+                warn!("Removing {} from actors", info.uuid());
+                self.ctx.actors.remove(&info);
             });
     }
 }
@@ -188,7 +188,7 @@ where
 impl<A, F, Output> Handler<ActorsIter<A, F, Output>> for ScheduleActor<A>
 where
     A: 'static + Task + Actor<Context = Context<A>> + Unpin,
-    F: 'static + FnOnce(HashMap<Uuid, Addr<A>>) -> ResponseFuture<Output>,
+    F: 'static + FnOnce(HashMap<TaskInfo, Addr<A>>) -> ResponseFuture<Output>,
     Output: 'static,
 {
     type Result = ResponseActFuture<Self, Output>;

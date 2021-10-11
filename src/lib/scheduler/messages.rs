@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use actix::{Actor, Addr, Message, ResponseFuture};
-use uuid::Uuid;
 
 use crate::db::DBResult;
 use crate::scheduler::models::TaskInfo;
@@ -14,7 +13,7 @@ pub struct TrySchedule<T>(pub(crate) ScheduleMode, PhantomData<T>);
 unsafe impl<T> Send for TrySchedule<T> {}
 
 impl<T: Actor> Message for TrySchedule<T> {
-    type Result = DBResult<Option<(Uuid, Addr<T>)>>;
+    type Result = DBResult<Option<(TaskInfo, Addr<T>)>>;
 }
 
 /// Update the timestamp.
@@ -52,7 +51,7 @@ pub struct TriggerGC;
 #[derive(Debug, Copy, Clone)]
 pub struct ActorsIter<A, F, Output>
 where
-    F: FnOnce(HashMap<Uuid, Addr<A>>) -> ResponseFuture<Output>,
+    F: FnOnce(HashMap<TaskInfo, Addr<A>>) -> ResponseFuture<Output>,
     A: Actor,
 {
     inner: F,
@@ -63,7 +62,7 @@ where
 impl<A, F, Output> Message for ActorsIter<A, F, Output>
 where
     A: Actor,
-    F: FnOnce(HashMap<Uuid, Addr<A>>) -> ResponseFuture<Output>,
+    F: FnOnce(HashMap<TaskInfo, Addr<A>>) -> ResponseFuture<Output>,
     Output: 'static,
 {
     type Result = Output;
@@ -77,7 +76,7 @@ impl<T> TrySchedule<T> {
 
 impl<A, F, Output> ActorsIter<A, F, Output>
 where
-    F: FnOnce(HashMap<Uuid, Addr<A>>) -> ResponseFuture<Output>,
+    F: FnOnce(HashMap<TaskInfo, Addr<A>>) -> ResponseFuture<Output>,
     A: Actor,
 {
     pub fn new(f: F) -> Self {
