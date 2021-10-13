@@ -29,7 +29,7 @@ futures = "0.3"
 humantime-serde = "1.0"
 itertools = "0.10"
 lapin = "1.8"
-mongodb = "2.0.0"
+mongodb = "2.0.1"
 num_cpus = "1.13"
 once_cell = { version = "1.8", features = ["parking_lot"] }
 parking_lot = "0.11"
