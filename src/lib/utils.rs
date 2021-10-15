@@ -3,6 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use actix::Addr;
 use actix_rt::task::JoinHandle;
+use derive_new::new;
 
 use crate::scheduler::actor::ScheduleActor;
 
@@ -150,14 +151,9 @@ pub fn timestamp(t: SystemTime) -> i64 {
     t.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64
 }
 
+#[derive(new)]
 pub struct CancelOnDrop<T> {
     handle: JoinHandle<T>,
-}
-
-impl<T> CancelOnDrop<T> {
-    pub fn new(handle: JoinHandle<T>) -> Self {
-        Self { handle }
-    }
 }
 
 impl<T> Deref for CancelOnDrop<T> {
@@ -174,20 +170,12 @@ impl<T> Drop for CancelOnDrop<T> {
     }
 }
 
+#[derive(new)]
 pub struct CustomGuard<T>
 where
     T: FnMut(),
 {
     on_exit: T,
-}
-
-impl<T> CustomGuard<T>
-where
-    T: FnMut(),
-{
-    pub fn new(on_exit: T) -> Self {
-        Self { on_exit }
-    }
 }
 
 impl<T> Drop for CustomGuard<T>

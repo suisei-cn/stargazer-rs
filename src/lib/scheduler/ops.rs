@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
+use derive_new::new;
 use futures::{StreamExt, TryStreamExt};
 use mongodb::bson::{self, bson, doc, Document};
 use mongodb::error::Result as DBResult;
@@ -17,14 +18,9 @@ use crate::utils::timestamp;
 
 use super::models::{SchedulerMeta, TaskInfo};
 
+#[derive(Debug, Copy, Clone, new)]
 pub struct CheckOwnershipOp {
     info: TaskInfo,
-}
-
-impl CheckOwnershipOp {
-    pub const fn new(info: TaskInfo) -> Self {
-        Self { info }
-    }
 }
 
 #[async_trait]
@@ -44,16 +40,10 @@ impl DBOperation for CheckOwnershipOp {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, new)]
 pub struct UpdateEntryOp<T> {
     info: TaskInfo,
     body: Option<T>,
-}
-
-impl<T> UpdateEntryOp<T> {
-    pub const fn new(info: TaskInfo, body: Option<T>) -> Self {
-        Self { info, body }
-    }
 }
 
 #[async_trait]
@@ -119,15 +109,9 @@ impl Default for ScheduleMode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, new)]
 pub struct GetAllTasksCount {
     base_query: Document,
-}
-
-impl GetAllTasksCount {
-    pub const fn new(base_query: Document) -> Self {
-        Self { base_query }
-    }
 }
 
 #[async_trait]
@@ -146,7 +130,7 @@ impl DBOperation for GetAllTasksCount {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, new)]
 pub struct GetWorkerInfoOp {
     base_query: Document,
     since_ts: i64,
@@ -186,31 +170,11 @@ impl DBOperation for GetWorkerInfoOp {
     }
 }
 
-impl GetWorkerInfoOp {
-    pub const fn new(base_query: Document, retry_ts: i64, parent_id: Uuid) -> Self {
-        Self {
-            base_query,
-            since_ts: retry_ts,
-            parent_id,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, new)]
 pub struct GetTasksOnWorkerOp {
     base_query: Document,
     since_ts: i64,
     worker: Uuid,
-}
-
-impl GetTasksOnWorkerOp {
-    pub const fn new(base_query: Document, since_ts: i64, worker: Uuid) -> Self {
-        Self {
-            base_query,
-            since_ts,
-            worker,
-        }
-    }
 }
 
 #[async_trait]

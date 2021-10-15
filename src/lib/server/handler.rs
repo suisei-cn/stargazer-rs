@@ -2,21 +2,14 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use derive_new::new;
 use futures::ready;
 use tokio::sync::mpsc::UnboundedReceiver;
 
+#[derive(new)]
 pub struct ArbiterHandler {
-    rx: UnboundedReceiver<()>,
     stop_count: usize,
-}
-
-impl ArbiterHandler {
-    pub const fn new(arb_count: usize, rx: UnboundedReceiver<()>) -> Self {
-        Self {
-            rx,
-            stop_count: arb_count,
-        }
-    }
+    rx: UnboundedReceiver<()>,
 }
 
 impl Future for ArbiterHandler {

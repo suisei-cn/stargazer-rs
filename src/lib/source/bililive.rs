@@ -8,6 +8,7 @@ use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
 use bililive::connect::tokio::connect_with_retry;
 use bililive::{BililiveError, ConfigBuilder, Packet, RetryConfig};
+use getset::CopyGetters;
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, info_span, warn, Span};
@@ -20,15 +21,10 @@ use crate::source::ToCollector;
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash, CopyGetters)]
+#[getset(get_copy = "pub")]
 pub struct BililiveEntry {
     uid: u64,
-}
-
-impl BililiveEntry {
-    pub const fn uid(&self) -> u64 {
-        self.uid
-    }
 }
 
 #[derive(Debug, Clone, SignalHandler)]

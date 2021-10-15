@@ -1,26 +1,15 @@
 use actix::{Actor, Context, Handler, Message, Supervised, System, SystemService};
 use actix_web::dev::Server as ActixServer;
+use derive_new::new;
 
-#[derive(Debug, Clone, Message)]
+#[derive(Debug, Clone, Message, new)]
 #[rtype("()")]
 pub struct RegisterHttpServer(ActixServer);
 
-impl RegisterHttpServer {
-    pub const fn new(srv: ActixServer) -> Self {
-        Self(srv)
-    }
-}
-
-#[derive(Debug, Copy, Clone, Message)]
+#[derive(Debug, Copy, Clone, Message, new)]
 #[rtype("()")]
 pub struct Kill {
     graceful: bool,
-}
-
-impl Kill {
-    pub const fn new(graceful: bool) -> Self {
-        Self { graceful }
-    }
 }
 
 #[derive(Debug, Default)]

@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use actix::dev::ToEnvelope;
 use actix::{Actor, Addr, Handler, MailboxError, Message};
+use derive_new::new;
+use getset::CopyGetters;
 use itertools::Itertools;
 use once_cell::unsync::OnceCell;
 use parking_lot::RwLock;
@@ -25,20 +27,15 @@ pub trait MessageTarget: Copy + Send {
     type Addr: TypeEq<Other = Addr<Self::Actor>>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, new, CopyGetters)]
 pub struct ArbiterContext {
+    #[getset(get_copy = "pub")]
     instance_id: Uuid,
+    #[new(value = "Uuid::new_v4()")]
+    #[getset(get_copy = "pub")]
     arbiter_id: Uuid,
+    #[new(default)]
     addrs: HashMap<TypeId, Arc<dyn Any + Send + Sync>>,
-}
-
-impl ArbiterContext {
-    pub const fn instance_id(&self) -> Uuid {
-        self.instance_id
-    }
-    pub const fn arbiter_id(&self) -> Uuid {
-        self.arbiter_id
-    }
 }
 
 impl ArbiterContext {
@@ -78,14 +75,6 @@ impl ArbiterContext {
 }
 
 impl ArbiterContext {
-    pub fn new(instance_id: Uuid) -> Self {
-        Self {
-            instance_id,
-            arbiter_id: Uuid::new_v4(),
-            addrs: HashMap::new(),
-        }
-    }
-
     pub fn register_addr<A: 'static + Send + Sync>(mut self, addr: A) -> Self {
         self.addrs.insert(addr.type_id(), Arc::new(addr));
         self
@@ -124,34 +113,16 @@ impl ArbiterContext {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, new, CopyGetters)]
 pub struct InstanceContext {
-    instance_id: Uuid,
+    #[new(value = "Uuid::new_v4()")]
+    #[getset(get_copy = "pub")]
+    id: Uuid,
+    #[new(value = "RwLock::new(vec![])")]
     arbiters: RwLock<Vec<ArbiterContext>>,
 }
 
 impl InstanceContext {
-    pub const fn instance_id(&self) -> Uuid {
-        self.instance_id
-    }
-}
-
-impl Default for InstanceContext {
-    fn default() -> Self {
-        Self {
-            instance_id: Uuid::new_v4(),
-            arbiters: RwLock::new(vec![]),
-        }
-    }
-}
-
-impl InstanceContext {
-    pub fn new() -> Self {
-        Default::default()
-    }
-    pub const fn id(&self) -> Uuid {
-        self.instance_id
-    }
     pub fn register(&self, ctx: ArbiterContext) {
         self.arbiters.write().push(ctx);
     }
@@ -238,8 +209,8 @@ mod tests {
     #[actix::test]
     async fn must_instance_send() {
         let inst = InstanceContext::new();
-        let arb_1 = ArbiterContext::new(inst.instance_id()).register_addr(Echo::default().start());
-        let arb_2 = ArbiterContext::new(inst.instance_id()).register_addr(Echo2::default().start());
+        let arb_1 = ArbiterContext::new(inst.id()).register_addr(Echo::default().start());
+        let arb_2 = ArbiterContext::new(inst.id()).register_addr(Echo2::default().start());
         inst.register(arb_1);
         inst.register(arb_2);
         assert!(
@@ -248,10 +219,10 @@ mod tests {
         );
 
         let inst = InstanceContext::new();
-        let arb_1 = ArbiterContext::new(inst.instance_id())
+        let arb_1 = ArbiterContext::new(inst.id())
             .register_addr(Echo::default().start())
             .register_addr(Adder::new(0).start());
-        let arb_2 = ArbiterContext::new(inst.instance_id())
+        let arb_2 = ArbiterContext::new(inst.id())
             .register_addr(Echo::default().start())
             .register_addr(Adder::new(1).start());
         inst.register(arb_1);

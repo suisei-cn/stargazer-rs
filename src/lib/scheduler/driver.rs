@@ -2,6 +2,7 @@ use std::mem;
 use std::time::Duration;
 
 use actix::{Actor, Addr, AsyncContext, AtomicResponse, Context, Handler, Message, WrapFuture};
+use derive_new::new;
 use rand::{thread_rng, Rng};
 use tracing::info_span;
 use tracing_actix::ActorInstrument;
@@ -11,36 +12,22 @@ use crate::scheduler::ops::ScheduleMode;
 use crate::scheduler::{ScheduleActor, Task};
 use crate::ScheduleConfig;
 
-#[derive(Debug)]
+#[derive(Debug, new)]
 pub struct ScheduleDriverActor<T: Task> {
     config: ScheduleConfig,
+    #[new(default)]
     addrs: Vec<Addr<ScheduleActor<T>>>,
 }
 
 impl_stop_on_panic!(ScheduleDriverActor<T: Task>);
 
-impl<T: Task> ScheduleDriverActor<T> {
-    pub fn new(config: ScheduleConfig) -> Self {
-        Self {
-            config,
-            addrs: Default::default(),
-        }
-    }
-}
-
 #[derive(Debug, Copy, Clone, Message)]
 #[rtype("()")]
 pub struct ScheduleAll(ScheduleMode);
 
-#[derive(Debug, Clone, Message)]
+#[derive(Debug, Clone, Message, new)]
 #[rtype("()")]
 pub struct RegisterScheduler<T: Task>(Addr<ScheduleActor<T>>);
-
-impl<T: Task> RegisterScheduler<T> {
-    pub fn new(addr: Addr<ScheduleActor<T>>) -> Self {
-        Self(addr)
-    }
-}
 
 impl<T: Task> Actor for ScheduleDriverActor<T> {
     type Context = Context<Self>;

@@ -2,13 +2,15 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use actix::{Actor, Addr, Message, ResponseFuture};
+use derive_new::new;
+use getset::CopyGetters;
 
 use crate::db::DBResult;
 use crate::scheduler::models::TaskInfo;
 use crate::scheduler::ops::ScheduleMode;
 
-#[derive(Debug, Copy, Clone)]
-pub struct TrySchedule<T>(pub(crate) ScheduleMode, PhantomData<T>);
+#[derive(Debug, Copy, Clone, new)]
+pub struct TrySchedule<T>(pub(crate) ScheduleMode, #[new(default)] PhantomData<T>);
 
 unsafe impl<T> Send for TrySchedule<T> {}
 
@@ -18,22 +20,11 @@ impl<T: Actor> Message for TrySchedule<T> {
 
 /// Check whether this worker still owns the resource.
 /// Returns `false` if the resource bound to this worker is replaced by another worker or deleted
-#[derive(Debug, Copy, Clone, Message)]
+#[derive(Debug, Copy, Clone, Message, new, CopyGetters)]
 #[rtype("DBResult<bool>")]
+#[getset(get_copy = "pub")]
 pub struct CheckOwnership {
     info: TaskInfo,
-}
-
-impl CheckOwnership {
-    pub const fn info(&self) -> TaskInfo {
-        self.info
-    }
-}
-
-impl CheckOwnership {
-    pub const fn new(info: TaskInfo) -> Self {
-        Self { info }
-    }
 }
 
 /// Update the timestamp.
@@ -41,15 +32,15 @@ impl CheckOwnership {
 #[derive(Debug, Clone, Message)]
 #[rtype("DBResult<bool>")]
 pub struct UpdateEntry<T> {
-    pub info: TaskInfo,
-    pub body: Option<T>,
+    pub(crate) info: TaskInfo,
+    pub(crate) body: Option<T>,
 }
 
 impl<T> UpdateEntry<T> {
-    pub fn new(info: TaskInfo, body: impl Into<Option<T>>) -> Self {
+    pub const fn new(info: TaskInfo, body: T) -> Self {
         Self {
             info,
-            body: body.into(),
+            body: Some(body),
         }
     }
 }
@@ -60,22 +51,11 @@ impl UpdateEntry<()> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Message)]
+#[derive(Debug, Copy, Clone, Message, new, CopyGetters)]
 #[rtype("()")]
+#[getset(get_copy = "pub")]
 pub struct UpdateAll {
     evict: bool,
-}
-
-impl UpdateAll {
-    pub const fn evict(&self) -> bool {
-        self.evict
-    }
-}
-
-impl UpdateAll {
-    pub const fn new(evict: bool) -> Self {
-        Self { evict }
-    }
 }
 
 #[derive(Debug, Copy, Clone, Message)]
@@ -86,14 +66,16 @@ pub struct GetId;
 #[rtype("()")]
 pub struct TriggerGC;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, new)]
 pub struct ActorsIter<A, F, Output>
 where
     F: FnOnce(HashMap<TaskInfo, Addr<A>>) -> ResponseFuture<Output>,
     A: Actor,
 {
     inner: F,
+    #[new(default)]
     __marker_1: PhantomData<A>,
+    #[new(default)]
     __marker_2: PhantomData<Output>,
 }
 
@@ -106,24 +88,11 @@ where
     type Result = Output;
 }
 
-impl<T> TrySchedule<T> {
-    pub const fn new(mode: ScheduleMode) -> Self {
-        Self(mode, PhantomData)
-    }
-}
-
 impl<A, F, Output> ActorsIter<A, F, Output>
 where
     F: FnOnce(HashMap<TaskInfo, Addr<A>>) -> ResponseFuture<Output>,
     A: Actor,
 {
-    pub fn new(f: F) -> Self {
-        Self {
-            inner: f,
-            __marker_1: PhantomData,
-            __marker_2: PhantomData,
-        }
-    }
     pub fn into_inner(self) -> F {
         self.inner
     }

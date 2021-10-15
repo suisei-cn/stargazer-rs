@@ -4,6 +4,8 @@ use std::time::Duration;
 
 use figment::providers::{Env, Serialized};
 use figment::{Error, Figment};
+use getset::CopyGetters;
+use getset::Getters;
 use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -20,38 +22,26 @@ pub type AMQPConfig = AMQP;
 pub type TwitterConfig = Twitter;
 
 /// Contains all configuration to run the application.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
+#[derive(
+    Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default, CopyGetters, Getters,
+)]
 pub struct Config {
+    #[getset(get_copy = "pub")]
     basic: Basic,
+    #[getset(get_copy = "pub")]
     http: HTTP,
+    #[getset(get_copy = "pub")]
     schedule: Schedule,
+    #[getset(get = "pub")]
     mongodb: MongoDB,
+    #[getset(get = "pub")]
     collector: Collector,
+    #[getset(get = "pub")]
     source: Source,
 }
 
-impl Config {
-    pub const fn basic(&self) -> Basic {
-        self.basic
-    }
-    pub const fn http(&self) -> HTTP {
-        self.http
-    }
-    pub const fn schedule(&self) -> Schedule {
-        self.schedule
-    }
-    pub const fn mongodb(&self) -> &MongoDB {
-        &self.mongodb
-    }
-    pub const fn collector(&self) -> &Collector {
-        &self.collector
-    }
-    pub const fn source(&self) -> &Source {
-        &self.source
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default, CopyGetters)]
+#[getset(get_copy = "pub")]
 pub struct Basic {
     /// Workers on instance. Non-set or zero value set the value to count of available logical cpu cores.
     #[serde(deserialize_with = "to_maybe_non_zero")]
@@ -67,13 +57,8 @@ where
     num.map_or(Ok(None), |num| Ok(if num == 0 { None } else { Some(num) }))
 }
 
-impl Basic {
-    pub const fn workers(&self) -> Option<usize> {
-        self.workers
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, CopyGetters)]
+#[getset(get_copy = "pub")]
 pub struct Schedule {
     /// Interval between schedule attempts.
     #[serde(with = "humantime_serde")]
@@ -84,18 +69,6 @@ pub struct Schedule {
     /// Max allowed duration for an entry to be an orphan.
     #[serde(with = "humantime_serde")]
     max_interval: Duration,
-}
-
-impl Schedule {
-    pub const fn schedule_interval(&self) -> Duration {
-        self.schedule_interval
-    }
-    pub const fn balance_interval(&self) -> Duration {
-        self.balance_interval
-    }
-    pub const fn max_interval(&self) -> Duration {
-        self.max_interval
-    }
 }
 
 impl Default for Schedule {
@@ -151,19 +124,14 @@ impl Default for MongoDB {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
+#[derive(
+    Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default, Getters, CopyGetters,
+)]
 pub struct Collector {
+    #[getset(get = "pub")]
     amqp: AMQP,
+    #[getset(get_copy = "pub")]
     debug: DebugCollector,
-}
-
-impl Collector {
-    pub const fn amqp(&self) -> &AMQP {
-        &self.amqp
-    }
-    pub const fn debug(&self) -> DebugCollector {
-        self.debug
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -178,15 +146,10 @@ impl Default for Twitter {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, CopyGetters)]
+#[getset(get_copy = "pub")]
 pub struct Bililive {
     enabled: bool,
-}
-
-impl Bililive {
-    pub const fn enabled(&self) -> bool {
-        self.enabled
-    }
 }
 
 impl Default for Bililive {
@@ -195,34 +158,22 @@ impl Default for Bililive {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default, CopyGetters)]
+#[getset(get_copy = "pub")]
 pub struct DebugSource {
     enabled: bool,
 }
 
-impl DebugSource {
-    pub const fn enabled(&self) -> bool {
-        self.enabled
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default)]
+#[derive(
+    Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Default, CopyGetters, Getters,
+)]
 pub struct Source {
+    #[getset(get = "pub")]
     twitter: Twitter,
+    #[getset(get_copy = "pub")]
     bililive: Bililive,
+    #[getset(get_copy = "pub")]
     debug: DebugSource,
-}
-
-impl Source {
-    pub const fn twitter(&self) -> &Twitter {
-        &self.twitter
-    }
-    pub const fn bililive(&self) -> Bililive {
-        self.bililive
-    }
-    pub const fn debug(&self) -> DebugSource {
-        self.debug
-    }
 }
 
 // TODO workaround before https://github.com/serde-rs/serde/pull/2056 is merged
@@ -244,15 +195,10 @@ impl Default for AMQP {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Default, CopyGetters)]
+#[getset(get_copy = "pub")]
 pub struct DebugCollector {
     enabled: bool,
-}
-
-impl DebugCollector {
-    pub const fn enabled(&self) -> bool {
-        self.enabled
-    }
 }
 
 impl Config {

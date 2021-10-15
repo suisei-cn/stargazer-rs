@@ -8,6 +8,7 @@ use actix::{
 };
 use actix_signal::{AddrSignalExt, SignalHandler};
 use futures::FutureExt;
+use getset::{CopyGetters, Getters};
 use itertools::Itertools;
 use serde::Serialize;
 use tracing::{info, info_span, warn};
@@ -28,21 +29,17 @@ use super::models::SchedulerMeta;
 use super::ops::ScheduleOp;
 use super::Task;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Getters, CopyGetters)]
 pub struct ScheduleContext<T: Actor + SignalHandler> {
+    #[getset(get_copy = "pub")]
     id: Uuid,
+    #[getset(get = "pub")]
     actors: HashMap<TaskInfo, Addr<T>>,
 }
 
 impl<T: Actor + SignalHandler> ScheduleContext<T> {
     pub fn new() -> Self {
         Default::default()
-    }
-    pub fn id(&self) -> Uuid {
-        self.id
-    }
-    pub fn actors(&self) -> &HashMap<TaskInfo, Addr<T>> {
-        &self.actors
     }
 }
 

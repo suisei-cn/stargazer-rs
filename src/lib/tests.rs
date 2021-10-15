@@ -1,4 +1,5 @@
 use actix::{Actor, Context, Handler, Message, System};
+use derive_new::new;
 use uuid::Uuid;
 
 use crate::common::ResponseWrapper;
@@ -86,14 +87,8 @@ impl Handler<Query> for Echo2 {
 #[rtype("usize")]
 pub struct Val(pub usize);
 
-#[derive(Debug)]
+#[derive(Debug, new)]
 pub struct Adder(pub usize);
-
-impl Adder {
-    pub fn new(other: usize) -> Self {
-        Self(other)
-    }
-}
 
 impl_message_target!(pub AdderTarget, Adder);
 
