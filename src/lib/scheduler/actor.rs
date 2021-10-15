@@ -19,8 +19,8 @@ use crate::common::ResponseWrapper;
 use crate::config::ScheduleConfig;
 use crate::db::{Collection, DBOperation, DBResult, Document};
 use crate::scheduler::driver::{RegisterScheduler, ScheduleDriverActor};
-use crate::scheduler::messages::{UpdateAll, UpdateEntry};
-use crate::scheduler::ops::{ScheduleMode, UpdateEntryOp};
+use crate::scheduler::messages::{CheckOwnership, UpdateAll, UpdateEntry};
+use crate::scheduler::ops::{CheckOwnershipOp, ScheduleMode, UpdateEntryOp};
 use crate::scheduler::TaskInfo;
 
 use super::messages::{ActorsIter, GetId, TriggerGC, TrySchedule};
@@ -136,6 +136,19 @@ where
             })
             .actor_instrument(info_span!("scheduler", id=?scheduler_id)),
         ))
+    }
+}
+
+impl<T> Handler<CheckOwnership> for ScheduleActor<T>
+where
+    T: 'static + Task + Unpin,
+{
+    type Result = ResponseFuture<DBResult<bool>>;
+
+    fn handle(&mut self, msg: CheckOwnership, _ctx: &mut Self::Context) -> Self::Result {
+        let collection = self.collection.clone();
+        let op = CheckOwnershipOp::new(msg.info());
+        Box::pin(async move { op.execute(&collection).await })
     }
 }
 

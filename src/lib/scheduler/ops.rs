@@ -17,6 +17,33 @@ use crate::utils::timestamp;
 
 use super::models::{SchedulerMeta, TaskInfo};
 
+pub struct CheckOwnershipOp {
+    info: TaskInfo,
+}
+
+impl CheckOwnershipOp {
+    pub const fn new(info: TaskInfo) -> Self {
+        Self { info }
+    }
+}
+
+#[async_trait]
+impl DBOperation for CheckOwnershipOp {
+    type Result = bool;
+    type Item = TaskInfo;
+
+    fn desc() -> &'static str {
+        "CheckOwnership"
+    }
+
+    async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
+        collection
+            .find_one(bson::to_document(&self.info).unwrap(), None)
+            .await
+            .map(|maybe| maybe.is_some())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct UpdateEntryOp<T> {
     info: TaskInfo,

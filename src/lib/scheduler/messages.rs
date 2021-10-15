@@ -16,6 +16,26 @@ impl<T: Actor> Message for TrySchedule<T> {
     type Result = DBResult<Option<(TaskInfo, Addr<T>)>>;
 }
 
+/// Check whether this worker still owns the resource.
+/// Returns `false` if the resource bound to this worker is replaced by another worker or deleted
+#[derive(Debug, Copy, Clone, Message)]
+#[rtype("DBResult<bool>")]
+pub struct CheckOwnership {
+    info: TaskInfo,
+}
+
+impl CheckOwnership {
+    pub const fn info(&self) -> TaskInfo {
+        self.info
+    }
+}
+
+impl CheckOwnership {
+    pub const fn new(info: TaskInfo) -> Self {
+        Self { info }
+    }
+}
+
 /// Update the timestamp.
 /// Returns `false` if the resource bound to this worker is replaced by another worker or deleted
 #[derive(Debug, Clone, Message)]
