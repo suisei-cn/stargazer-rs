@@ -14,8 +14,8 @@ use tracing::{debug, error, info, info_span, warn, Span};
 use tracing_actix::ActorInstrument;
 
 use crate::db::{Coll, Collection, Document};
-use crate::scheduler::messages::UpdateEntry;
-use crate::scheduler::{InfoGetter, SchedulerGetter, Task, TaskInfo};
+use crate::scheduler::messages::CheckOwnership;
+use crate::scheduler::{SchedulerGetter, Task, TaskInfo};
 use crate::source::ToCollector;
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
@@ -70,7 +70,7 @@ impl Actor for BililiveActor {
         ctx.run_interval(self.schedule_config.max_interval / 2, |act, ctx| {
             ctx.spawn(
                 act.get_scheduler()
-                    .send(UpdateEntry::empty_payload(act.get_info()))
+                    .send(CheckOwnership::new(act.info))
                     .into_actor(act)
                     .map(|res, _act, ctx| {
                         if !res.unwrap_or(Ok(false)).unwrap_or(false) {

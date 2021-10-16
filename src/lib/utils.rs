@@ -119,9 +119,7 @@ macro_rules! impl_to_collector_handler {
 
                 Box::pin(
                     self.get_scheduler()
-                        .send(crate::scheduler::messages::UpdateEntry::empty_payload(
-                            self.get_info(),
-                        ))
+                        .send(crate::scheduler::messages::CheckOwnership::new(self.get_info()))
                         .into_actor(self)
                         .map(move |res, _act, ctx| {
                             let holding_ownership = res.unwrap_or(Ok(false)).unwrap_or(false);
