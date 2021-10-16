@@ -255,8 +255,14 @@ where
 
     fn started(&mut self, ctx: &mut Self::Context) {
         self.driver.do_send(RegisterScheduler::new(ctx.address()));
-        ctx.run_interval(self.config.max_interval / 2, |_, ctx| {
-            ctx.notify(TriggerGC);
+        ctx.run_interval(self.config.max_interval / 2, |act, ctx| {
+            ctx.spawn(
+                ctx.address()
+                    .send(TriggerGC)
+                    .into_actor(act)
+                    .then(|_, act, ctx| ctx.address().send(UpdateAll::new(true)).into_actor(act))
+                    .map(|_, _, _| ()),
+            );
         });
     }
 }

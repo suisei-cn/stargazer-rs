@@ -1,14 +1,12 @@
-use actix::{Actor, ActorContext, ActorFutureExt, AsyncContext, Context, WrapFuture};
+use actix::{Actor, Context};
 use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, info_span, warn, Span};
-use tracing_actix::ActorInstrument;
+use tracing::{debug, info, info_span, Span};
 
 use crate::db::{Coll, Collection, Document};
-use crate::scheduler::messages::UpdateEntry;
-use crate::scheduler::{InfoGetter, SchedulerGetter, Task, TaskInfo};
+use crate::scheduler::{Task, TaskInfo};
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
 
@@ -32,24 +30,9 @@ impl_to_collector_handler!(DebugActor);
 impl Actor for DebugActor {
     type Context = Context<Self>;
 
-    fn started(&mut self, ctx: &mut Self::Context) {
+    fn started(&mut self, _ctx: &mut Self::Context) {
         self.span().in_scope(|| {
             info!("started");
-        });
-
-        ctx.run_interval(self.schedule_config.max_interval / 2, |act, ctx| {
-            ctx.spawn(
-                act.get_scheduler()
-                    .send(UpdateEntry::empty_payload(act.get_info()))
-                    .into_actor(act)
-                    .map(|res, _act, ctx| {
-                        if !res.unwrap_or(Ok(false)).unwrap_or(false) {
-                            warn!("unable to renew ts, trying to stop");
-                            ctx.stop();
-                        }
-                    }),
-            )
-            .actor_instrument(act.span());
         });
     }
 

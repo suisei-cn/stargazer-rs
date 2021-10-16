@@ -10,12 +10,11 @@ use bililive::connect::tokio::connect_with_retry;
 use bililive::{BililiveError, ConfigBuilder, Packet, RetryConfig};
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, info_span, warn, Span};
+use tracing::{debug, error, info, info_span, Span};
 use tracing_actix::ActorInstrument;
 
 use crate::db::{Coll, Collection, Document};
-use crate::scheduler::messages::CheckOwnership;
-use crate::scheduler::{SchedulerGetter, Task, TaskInfo};
+use crate::scheduler::{Task, TaskInfo};
 use crate::source::ToCollector;
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
@@ -63,23 +62,6 @@ impl Actor for BililiveActor {
     fn started(&mut self, ctx: &mut Self::Context) {
         self.span().in_scope(|| {
             info!("started");
-        });
-
-        // update timestamp
-        // TODO may not wake on time, investigation needed
-        ctx.run_interval(self.schedule_config.max_interval / 2, |act, ctx| {
-            ctx.spawn(
-                act.get_scheduler()
-                    .send(CheckOwnership::new(act.info))
-                    .into_actor(act)
-                    .map(|res, _act, ctx| {
-                        if !res.unwrap_or(Ok(false)).unwrap_or(false) {
-                            warn!("unable to renew ts, trying to stop");
-                            ctx.stop();
-                        }
-                    }),
-            )
-            .actor_instrument(act.span());
         });
 
         let uid = self.uid;
