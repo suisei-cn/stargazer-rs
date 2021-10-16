@@ -8,7 +8,6 @@ use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
 use bililive::connect::tokio::connect_with_retry;
 use bililive::{BililiveError, ConfigBuilder, Packet, RetryConfig};
-use getset::CopyGetters;
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, info_span, warn, Span};
@@ -21,10 +20,9 @@ use crate::source::ToCollector;
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash, CopyGetters)]
-#[getset(get_copy = "pub")]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct BililiveEntry {
-    uid: u64,
+    pub uid: u64,
 }
 
 #[derive(Debug, Clone, SignalHandler)]
@@ -69,7 +67,7 @@ impl Actor for BililiveActor {
 
         // update timestamp
         // TODO may not wake on time, investigation needed
-        ctx.run_interval(self.schedule_config.max_interval() / 2, |act, ctx| {
+        ctx.run_interval(self.schedule_config.max_interval / 2, |act, ctx| {
             ctx.spawn(
                 act.get_scheduler()
                     .send(UpdateEntry::empty_payload(act.get_info()))
@@ -134,7 +132,7 @@ impl Task for BililiveActor {
         collection: Collection<Document>,
     ) -> Self {
         Self {
-            uid: entry.uid(),
+            uid: entry.uid,
             schedule_config: ctor,
             collection,
             info,
@@ -143,7 +141,7 @@ impl Task for BililiveActor {
     }
 
     fn span(&self) -> Span {
-        let task_id = self.info.uuid();
+        let task_id = self.info.uuid;
         let uid = self.uid;
         info_span!("bililive", ?task_id, uid)
     }

@@ -37,7 +37,7 @@ impl Actor for DebugActor {
             info!("started");
         });
 
-        ctx.run_interval(self.schedule_config.max_interval() / 2, |act, ctx| {
+        ctx.run_interval(self.schedule_config.max_interval / 2, |act, ctx| {
             ctx.spawn(
                 act.get_scheduler()
                     .send(UpdateEntry::empty_payload(act.get_info()))
@@ -84,7 +84,7 @@ impl Task for DebugActor {
     }
 
     fn span(&self) -> Span {
-        let task_id = self.info.uuid();
+        let task_id = self.info.uuid;
         let entry_id = self.entry.id;
         info_span!("debug", ?task_id, entry_id)
     }

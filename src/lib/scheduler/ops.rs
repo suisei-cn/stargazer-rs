@@ -65,7 +65,7 @@ impl<T: Serialize + Send> DBOperation for UpdateEntryOp<T> {
 
         Ok(collection
             .update_one(
-                doc! {"_id": self.info.doc_id(), "uuid": self.info.uuid().to_string()},
+                doc! {"_id": self.info.doc_id, "uuid": self.info.uuid.to_string()},
                 doc! {"$set": body},
                 None,
             )
@@ -226,7 +226,7 @@ impl<T> ScheduleOp<T> {
             "$set": {
                 "timestamp": now_ts,
                 "uuid": uuid.to_string(),
-                "parent_uuid": parent_meta.id().to_string()
+                "parent_uuid": parent_meta.id.to_string()
             }
         };
         Self {
@@ -277,13 +277,12 @@ impl<T> ScheduleOp<T> {
         let entries_count = GetAllTasksCount::new(self.query.clone())
             .execute(collection)
             .await?;
-        let workers =
-            GetWorkerInfoOp::new(self.query.clone(), self.since_ts, self.parent_meta.id())
-                .execute(collection)
-                .await?;
+        let workers = GetWorkerInfoOp::new(self.query.clone(), self.since_ts, self.parent_meta.id)
+            .execute(collection)
+            .await?;
 
         // allowed entries per worker is [expected, expected+1].
-        let self_count = self.parent_meta.actor_count() as u64;
+        let self_count = self.parent_meta.actor_count as u64;
         let workers_count = workers.len() as u64;
         let expected = entries_count / (workers_count + 1);
         let threshold = if self_count < expected {

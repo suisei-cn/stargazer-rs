@@ -34,14 +34,14 @@ impl<T: Task> Actor for ScheduleDriverActor<T> {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         let mut skip_once = true;
-        ctx.run_interval(self.config.schedule_interval(), |_, ctx| {
+        ctx.run_interval(self.config.schedule_interval, |_, ctx| {
             let delay: u64 = thread_rng().gen_range(0..1000);
             ctx.notify_later(
                 ScheduleAll(ScheduleMode::OutdatedOnly),
                 Duration::from_millis(delay),
             );
         });
-        ctx.run_interval(self.config.balance_interval(), move |_, ctx| {
+        ctx.run_interval(self.config.balance_interval, move |_, ctx| {
             if skip_once {
                 skip_once = false;
                 return;

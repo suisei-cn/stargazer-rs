@@ -70,15 +70,15 @@ async fn main() {
 
     let opts = Opts::parse();
     let config = Config::new(opts.config.as_deref()).unwrap();
-    let collector_config = config.collector().clone();
+    let collector_config = config.collector.clone();
     let sched_config = ScheduleConfig::default();
 
-    let source_config = config.source().clone();
-    let twitter_config = source_config.twitter().clone();
-    let bililive_config = source_config.bililive();
-    let debug_source_config = source_config.debug();
+    let source_config = config.source.clone();
+    let twitter_config = source_config.twitter.clone();
+    let bililive_config = source_config.bililive;
+    let debug_source_config = source_config.debug;
 
-    let db = connect_db(config.mongodb().uri(), config.mongodb().database())
+    let db = connect_db(config.mongodb.uri(), config.mongodb.database())
         .await
         .expect("unable to connect to db");
     let coll_bililive: Collection<Document> = db.collection("bililive");
@@ -96,7 +96,7 @@ async fn main() {
         let collector_config = collector_config.clone();
         let ctx = ArbiterContext::new(instance_id);
 
-        let bililive_actor: Option<ScheduleActor<BililiveActor>> = if bililive_config.enabled() {
+        let bililive_actor: Option<ScheduleActor<BililiveActor>> = if bililive_config.enabled {
             Some(
                 ScheduleActor::builder()
                     .collection(coll_bililive.clone())
@@ -124,7 +124,7 @@ async fn main() {
                 None
             };
 
-        let debug_actor: Option<ScheduleActor<DebugActor>> = if debug_source_config.enabled() {
+        let debug_actor: Option<ScheduleActor<DebugActor>> = if debug_source_config.enabled {
             Some(
                 ScheduleActor::builder()
                     .collection(coll_debug.clone())
@@ -158,10 +158,10 @@ async fn main() {
         };
 
         let mut collector_factories = Vec::new();
-        if let AMQP::Enabled { uri, exchange } = collector_config.amqp() {
+        if let AMQP::Enabled { uri, exchange } = collector_config.amqp {
             collector_factories.push(AMQPFactory::new(uri.as_str(), exchange.as_str()).into());
         }
-        if collector_config.debug().enabled() {
+        if collector_config.debug.enabled {
             collector_factories.push(DebugCollectorFactory.into());
         }
         let collector_actor = CollectorActor::new(collector_factories);
@@ -181,8 +181,8 @@ async fn main() {
                 .service(web::scope("/debug").service(stargazer_lib::source::debug::set));
         })
     })
-    .workers(config.basic().workers())
-    .run(config.http().into())
+    .workers(config.basic.workers)
+    .run(config.http.into())
     .unwrap()
     .await
     .unwrap();

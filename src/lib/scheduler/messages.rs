@@ -3,7 +3,6 @@ use std::marker::PhantomData;
 
 use actix::{Actor, Addr, Message, ResponseFuture};
 use derive_new::new;
-use getset::CopyGetters;
 
 use crate::db::DBResult;
 use crate::scheduler::models::TaskInfo;
@@ -20,11 +19,10 @@ impl<T: Actor> Message for TrySchedule<T> {
 
 /// Check whether this worker still owns the resource.
 /// Returns `false` if the resource bound to this worker is replaced by another worker or deleted
-#[derive(Debug, Copy, Clone, Message, new, CopyGetters)]
+#[derive(Debug, Copy, Clone, Message, new)]
 #[rtype("DBResult<bool>")]
-#[getset(get_copy = "pub")]
 pub struct CheckOwnership {
-    info: TaskInfo,
+    pub info: TaskInfo,
 }
 
 /// Update the timestamp.
@@ -32,8 +30,8 @@ pub struct CheckOwnership {
 #[derive(Debug, Clone, Message)]
 #[rtype("DBResult<bool>")]
 pub struct UpdateEntry<T> {
-    pub(crate) info: TaskInfo,
-    pub(crate) body: Option<T>,
+    pub info: TaskInfo,
+    pub body: Option<T>,
 }
 
 impl<T> UpdateEntry<T> {
@@ -51,11 +49,10 @@ impl UpdateEntry<()> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Message, new, CopyGetters)]
+#[derive(Debug, Copy, Clone, Message, new)]
 #[rtype("()")]
-#[getset(get_copy = "pub")]
 pub struct UpdateAll {
-    evict: bool,
+    pub evict: bool,
 }
 
 #[derive(Debug, Copy, Clone, Message)]

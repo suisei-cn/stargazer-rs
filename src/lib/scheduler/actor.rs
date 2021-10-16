@@ -102,7 +102,7 @@ where
                     ScheduleMode::Auto,
                     T::query(),
                     ctx_meta,
-                    config.max_interval(),
+                    config.max_interval,
                 )
                 .execute(&collection)
                 .await
@@ -144,7 +144,7 @@ where
 
     fn handle(&mut self, msg: CheckOwnership, _ctx: &mut Self::Context) -> Self::Result {
         let collection = self.collection.clone();
-        let op = CheckOwnershipOp::new(msg.info());
+        let op = CheckOwnershipOp::new(msg.info);
         Box::pin(async move { op.execute(&collection).await })
     }
 }
@@ -182,7 +182,7 @@ where
                 let collection = collection.clone();
                 async move {
                     let succ = op.execute(&collection).await.unwrap_or(false);
-                    if !succ && msg.evict() {
+                    if !succ && msg.evict {
                         addr.stop();
                     }
                 }
@@ -192,7 +192,7 @@ where
         Box::pin(
             futs.map(|_| ())
                 .into_actor(self)
-                .actor_instrument(info_span!("update_all", evict = msg.evict())),
+                .actor_instrument(info_span!("update_all", evict = msg.evict)),
         )
     }
 }
@@ -223,7 +223,7 @@ where
             .collect::<Vec<_>>()
             .into_iter()
             .for_each(|info| {
-                warn!("Removing {} from actors", info.uuid());
+                warn!("Removing {} from actors", info.uuid);
                 self.ctx.actors.remove(&info);
             });
     }
@@ -255,7 +255,7 @@ where
 
     fn started(&mut self, ctx: &mut Self::Context) {
         self.driver.do_send(RegisterScheduler::new(ctx.address()));
-        ctx.run_interval(self.config.max_interval() / 2, |_, ctx| {
+        ctx.run_interval(self.config.max_interval / 2, |_, ctx| {
             ctx.notify(TriggerGC);
         });
     }

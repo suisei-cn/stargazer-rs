@@ -63,7 +63,7 @@ impl Actor for TwitterActor {
             info!("started");
         });
 
-        ctx.run_interval(self.schedule_config.max_interval() / 2, |act, ctx| {
+        ctx.run_interval(self.schedule_config.max_interval / 2, |act, ctx| {
             let token = act.token.clone();
             let entry = act.entry;
             ctx.spawn(
@@ -162,7 +162,7 @@ impl Task for TwitterActor {
     }
 
     fn span(&self) -> Span {
-        let task_id = self.info.uuid();
+        let task_id = self.info.uuid;
         let uid = self.entry.uid;
         info_span!("twitter", ?task_id, uid)
     }
