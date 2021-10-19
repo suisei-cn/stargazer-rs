@@ -5,7 +5,7 @@ use actix::fut::ready;
 use actix::Actor;
 use actix_web::web::Data;
 use actix_web::{get, web, Responder};
-use clap::{AppSettings, Clap};
+use clap::{AppSettings, Parser};
 use itertools::Itertools;
 
 use stargazer_lib::collector::amqp::AMQPFactory;
@@ -23,7 +23,7 @@ use stargazer_lib::{
     ArbiterContext, Config, InstanceContext, ScheduleConfig, Server, TwitterConfig, AMQP,
 };
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(
     version = "1.0",
     author = "LightQuantum <self@lightquantum.me> and George Miao <gm@miao.dev>"
