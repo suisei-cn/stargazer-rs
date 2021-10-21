@@ -18,7 +18,18 @@ impl<T> TypeEq for T {
 }
 
 #[macro_export]
-/// impl_message_target!((pub) ActorTarget, Actor)
+macro_rules! o {
+    ($opt: ident .map_or($default: expr, |$arg: ident| $f: expr)) => {
+        if let Some($arg) = $opt {
+            $f
+        } else {
+            $default
+        }
+    };
+}
+
+#[macro_export]
+// impl_message_target!((pub) ActorTarget, Actor)
 macro_rules! impl_message_target {
     ( $target: ident, $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)? ) => {
         #[derive(Debug)]
@@ -65,7 +76,7 @@ macro_rules! impl_message_target {
 }
 
 #[macro_export]
-/// impl_stop_on_panic!(Actor)
+// impl_stop_on_panic!(Actor)
 macro_rules! impl_stop_on_panic {
     ( $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)? ) => {
         impl $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? Drop for $name $(< $( $lt ),+ >)? {
@@ -79,7 +90,7 @@ macro_rules! impl_stop_on_panic {
 }
 
 #[macro_export]
-/// impl_task_field_getter!(Actor, scheduler)
+// impl_task_field_getter!(Actor, scheduler)
 macro_rules! impl_task_field_getter {
     ($self: ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)?, $info: ident, $scheduler: ident) => {
         impl $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $crate::scheduler::InfoGetter for $self $(< $( $lt ),+ >)? {

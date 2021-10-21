@@ -23,6 +23,17 @@ use stargazer_lib::{
     ArbiterContext, Config, InstanceContext, ScheduleConfig, Server, TwitterConfig, AMQP,
 };
 
+#[macro_export]
+macro_rules! o {
+    ($opt: ident .map_or($default: expr, |$arg: ident| $f: expr)) => {
+        if let Some($arg) = $opt {
+            $f
+        } else {
+            $default
+        }
+    };
+}
+
 #[derive(Parser)]
 #[clap(
     version = "1.0",
@@ -61,8 +72,6 @@ async fn status(ctx: web::Data<InstanceContext>) -> impl Responder {
     format!("{:#?}", resp)
 }
 
-// TODO blocked by edition 2021
-#[allow(clippy::option_if_let_else)]
 #[actix_web::main]
 async fn main() {
     tracing_subscriber::fmt::init();
@@ -140,21 +149,9 @@ async fn main() {
         let twitter_addr = twitter_actor.map(Actor::start);
         let debug_addr = debug_actor.map(Actor::start);
 
-        let ctx = if let Some(addr) = bililive_addr {
-            ctx.register_addr(addr)
-        } else {
-            ctx
-        };
-        let ctx = if let Some(addr) = twitter_addr {
-            ctx.register_addr(addr)
-        } else {
-            ctx
-        };
-        let ctx = if let Some(addr) = debug_addr {
-            ctx.register_addr(addr)
-        } else {
-            ctx
-        };
+        let ctx = o!(bililive_addr.map_or(ctx, |addr| ctx.register_addr(addr)));
+        let ctx = o!(twitter_addr.map_or(ctx, |addr| ctx.register_addr(addr)));
+        let ctx = o!(debug_addr.map_or(ctx, |addr| ctx.register_addr(addr)));
 
         let mut collector_factories = Vec::new();
         if let AMQP::Enabled { uri, exchange } = collector_config.amqp {
