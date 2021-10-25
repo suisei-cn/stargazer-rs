@@ -45,7 +45,7 @@ tokio = { version = "1.12", features = ["rt", "net", "parking_lot", "signal", "s
 tokio-amqp = "1.0"
 tracing = "0.1"
 tracing-actix = "0.3"
-tracing-subscriber = { version = "0.2", features = ["parking_lot"] }
+tracing-subscriber = { version = "0.3", features = ["parking_lot"] }
 typed-builder = "0.9"
 uuid = { version = "0.8", features = ["v4", "serde"] }
 
