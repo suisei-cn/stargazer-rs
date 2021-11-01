@@ -419,17 +419,34 @@ checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
 name = "bililive"
-version = "0.1.1"
+version = "0.2.0-beta.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d2d7f88f5029bacc3057ae04bfc78d4bcd0bcadd4fd6fd78ccd90fb4615d25c"
+checksum = "576f7e269ab071a69e086f354ce38398091fc3089c84b1dab2fbf91cbfb27348"
 dependencies = [
  "async-tungstenite",
+ "bililive-core",
+ "futures",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "stream-reconnect",
+ "thiserror",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "bililive-core"
+version = "0.1.0-beta.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9bf95187f73b8293b22d1c672e1aa148fffd44104d0164d48a6c5a9f475589d4"
+dependencies = [
  "flate2",
  "futures",
  "log",
  "nom",
  "rand",
- "reqwest",
  "serde",
  "serde_json",
  "stream-reconnect",
@@ -2426,9 +2443,9 @@ checksum = "213701ba3370744dcd1a12960caa4843b3d68b4d1c0a5d575e0d65b2ee9d16c0"
 
 [[package]]
 name = "stream-reconnect"
-version = "0.3.3"
+version = "0.4.0-beta.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "026be0bf988a9ffec64c38bf9353d6784c679af57e4712d29fb6eafbc674db44"
+checksum = "fa0b4693e696374e4929166c8e2b5e7031a3be620ba359b0dbe1874a47664c9b"
 dependencies = [
  "futures",
  "log",

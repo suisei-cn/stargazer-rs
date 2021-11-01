@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::fmt::Debug;
 
 use actix::fut::ready;
@@ -7,7 +8,7 @@ use actix::{
 use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
 use bililive::connect::tokio::connect_with_retry;
-use bililive::{BililiveError, ConfigBuilder, Packet, RetryConfig};
+use bililive::{ConfigBuilder, Packet, RetryConfig, StreamError};
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, info_span, Span};
@@ -18,6 +19,8 @@ use crate::scheduler::{Task, TaskInfo};
 use crate::source::ToCollector;
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
+
+type BoxedError = Box<dyn Error>;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct BililiveEntry {
@@ -38,8 +41,8 @@ impl_stop_on_panic!(BililiveActor);
 impl_message_target!(pub BililiveTarget, BililiveActor);
 impl_to_collector_handler!(BililiveActor);
 
-impl StreamHandler<Result<Packet, BililiveError>> for BililiveActor {
-    fn handle(&mut self, item: Result<Packet, BililiveError>, ctx: &mut Self::Context) {
+impl StreamHandler<Result<Packet, StreamError>> for BililiveActor {
+    fn handle(&mut self, item: Result<Packet, StreamError>, ctx: &mut Self::Context) {
         let _span = self.span().entered();
         match item {
             Ok(msg) => {
@@ -73,13 +76,16 @@ impl Actor for BililiveActor {
                         connect_with_retry(
                             ConfigBuilder::new()
                                 .by_uid(uid)
-                                .await?
+                                .await
+                                .map_err(|e| Box::new(e) as BoxedError)?
                                 .fetch_conf()
-                                .await?
-                                .build()?,
+                                .await
+                                .map_err(|e| Box::new(e) as BoxedError)?
+                                .build(),
                             RetryConfig::default(),
                         )
                         .await
+                        .map_err(|e| Box::new(e) as BoxedError)
                     }
                     .into_actor(act)
                 })
