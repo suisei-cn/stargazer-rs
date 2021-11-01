@@ -7,8 +7,7 @@ use actix::{
 };
 use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
-use bililive::connect::tokio::connect_with_retry;
-use bililive::{ConfigBuilder, Packet, RetryConfig, StreamError};
+use actix_bililive::{connect_with_retry, ConfigBuilder, Packet, RetryConfig, StreamError};
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, info_span, Span};
