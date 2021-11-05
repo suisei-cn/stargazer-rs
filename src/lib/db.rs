@@ -4,13 +4,25 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use derive_new::new;
+use mongodb::bson::oid::ObjectId;
 pub use mongodb::bson::Document;
 pub use mongodb::error::Result as DBResult;
 pub use mongodb::Collection;
 use mongodb::{Client, Database};
+use serde::{Deserialize, Serialize};
 use tracing::{trace, warn};
 
 use crate::utils::{CancelOnDrop, CustomGuard};
+
+#[derive(Serialize, Deserialize)]
+pub struct DBRef {
+    #[serde(rename = "$ref")]
+    pub collection: String,
+    #[serde(rename = "$id")]
+    pub id: ObjectId,
+    #[serde(rename = "$db", skip_serializing_if = "Option::is_none")]
+    pub db: Option<String>,
+}
 
 #[derive(new)]
 pub struct Coll<T> {
@@ -53,13 +65,4 @@ pub async fn connect_db(db_uri: &str, db_name: &str) -> DBResult<Database> {
     Client::with_uri_str(db_uri)
         .await
         .map(|client| client.database(db_name))
-}
-
-pub fn transmute_collection<T, U>(coll: Collection<T>) -> Collection<U> {
-    unsafe { std::mem::transmute(coll) }
-}
-
-#[allow(clippy::missing_const_for_fn)]
-pub fn transmute_collection_ref<T, U>(coll: &Collection<T>) -> &Collection<U> {
-    unsafe { &*(coll as *const mongodb::Collection<T>).cast() }
 }
