@@ -72,6 +72,8 @@ async fn main() {
     let db = connect_db(config.mongodb.uri(), config.mongodb.database())
         .await
         .expect("unable to connect to db");
+
+    // TODO --- remove this part of code cuz they will be replaced by central metadata actor
     let coll_bililive: Collection<Document> = db.collection("bililive");
     let coll_twitter: Collection<Document> = db.collection("twitter");
     let coll_debug: Collection<Document> = db.collection("debug");
@@ -79,6 +81,7 @@ async fn main() {
     let arc_coll_bililive: Arc<Coll<BililiveColl>> = Arc::new(Coll::new(coll_bililive.clone()));
     let arc_coll_twitter: Arc<Coll<TwitterColl>> = Arc::new(Coll::new(coll_twitter.clone()));
     let arc_coll_debug: Arc<Coll<DebugColl>> = Arc::new(Coll::new(coll_debug.clone()));
+    // TODO ---
 
     let bililive_driver = ScheduleDriverActor::new(sched_config).start();
     let twitter_driver = ScheduleDriverActor::new(sched_config).start();
@@ -90,7 +93,7 @@ async fn main() {
         let bililive_actor: Option<ScheduleActor<BililiveActor>> = if bililive_config.enabled {
             Some(
                 ScheduleActor::builder()
-                    .collection(coll_bililive.clone())
+                    .db(&db)
                     .ctor_builder(ScheduleConfig::default)
                     .config(sched_config)
                     .driver(bililive_driver.clone())
@@ -105,7 +108,7 @@ async fn main() {
                 let token = token.clone();
                 Some(
                     ScheduleActor::builder()
-                        .collection(coll_twitter.clone())
+                        .db(&db)
                         .ctor_builder(move || TwitterCtor::new(sched_config, &*token))
                         .config(sched_config)
                         .driver(twitter_driver.clone())
@@ -118,7 +121,7 @@ async fn main() {
         let debug_actor: Option<ScheduleActor<DebugActor>> = if debug_source_config.enabled {
             Some(
                 ScheduleActor::builder()
-                    .collection(coll_debug.clone())
+                    .db(&db)
                     .ctor_builder(ScheduleConfig::default)
                     .config(sched_config)
                     .driver(debug_driver.clone())

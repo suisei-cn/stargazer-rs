@@ -13,21 +13,21 @@ use itertools::Itertools;
 use serde::Serialize;
 use tracing::{info, info_span, warn};
 use tracing_actix::ActorInstrument;
-use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::common::ResponseWrapper;
 use crate::config::ScheduleConfig;
 use crate::db::{Collection, DBOperation, DBResult, Document};
-use crate::scheduler::driver::{RegisterScheduler, ScheduleDriverActor};
-use crate::scheduler::messages::{CheckOwnership, UpdateAll, UpdateEntry};
-use crate::scheduler::ops::{CheckOwnershipOp, ScheduleMode, UpdateEntryOp};
-use crate::scheduler::TaskInfo;
 
+use super::builder::{ScheduleActorBuilder, BN};
+use super::driver::{RegisterScheduler, ScheduleDriverActor};
 use super::messages::{ActorsIter, GetId, TriggerGC, TrySchedule};
+use super::messages::{CheckOwnership, UpdateAll, UpdateEntry};
 use super::models::SchedulerMeta;
 use super::ops::ScheduleOp;
+use super::ops::{CheckOwnershipOp, ScheduleMode, UpdateEntryOp};
 use super::Task;
+use super::TaskInfo;
 
 #[derive(Debug, Clone, Getters, CopyGetters)]
 pub struct ScheduleContext<T: Actor + SignalHandler> {
@@ -52,18 +52,22 @@ impl<T: Actor + SignalHandler> Default for ScheduleContext<T> {
     }
 }
 
-#[derive(Clone, TypedBuilder)]
+#[derive(Clone)]
 pub struct ScheduleActor<T>
 where
     T: Task,
 {
     pub(crate) collection: Collection<Document>,
-    #[builder(setter(transform = | f: impl Fn() -> T::Ctor + Send + Sync + 'static | Arc::new(f) as Arc < dyn Fn() -> T::Ctor + Send + Sync >))]
     pub(crate) ctor_builder: Arc<dyn Fn() -> T::Ctor + Send + Sync>,
     pub(crate) config: ScheduleConfig,
-    #[builder(default, setter(skip))]
     pub(crate) ctx: ScheduleContext<T>,
     pub(crate) driver: Addr<ScheduleDriverActor<T>>,
+}
+
+impl<T: Task> ScheduleActor<T> {
+    pub fn builder() -> ScheduleActorBuilder<T, BN, BN, BN, BN> {
+        ScheduleActorBuilder::default()
+    }
 }
 
 impl<T: Task> Debug for ScheduleActor<T> {

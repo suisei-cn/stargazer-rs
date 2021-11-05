@@ -12,6 +12,7 @@ use crate::db::{Collection, Document};
 use crate::utils::Scheduler;
 
 pub mod actor;
+mod builder;
 pub mod driver;
 pub mod messages;
 mod models;
