@@ -12,6 +12,7 @@ use stargazer_lib::collector::amqp::AMQPFactory;
 use stargazer_lib::collector::debug::DebugCollectorFactory;
 use stargazer_lib::collector::CollectorActor;
 use stargazer_lib::db::{connect_db, Coll, Collection, Document};
+use stargazer_lib::o;
 use stargazer_lib::scheduler::driver::ScheduleDriverActor;
 use stargazer_lib::scheduler::messages::{ActorsIter, UpdateAll};
 use stargazer_lib::scheduler::ScheduleActor;
@@ -21,17 +22,6 @@ use stargazer_lib::source::twitter::{TwitterActor, TwitterColl, TwitterCtor};
 use stargazer_lib::{
     ArbiterContext, Config, InstanceContext, ScheduleConfig, Server, TwitterConfig, AMQP,
 };
-
-#[macro_export]
-macro_rules! o {
-    ($opt: ident .map_or($default: expr, |$arg: ident| $f: expr)) => {
-        if let Some($arg) = $opt {
-            $f
-        } else {
-            $default
-        }
-    };
-}
 
 #[derive(Parser)]
 #[clap(

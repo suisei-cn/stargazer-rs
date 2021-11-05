@@ -10,7 +10,7 @@ pub use server::*;
 pub use crate::config::*;
 
 #[macro_use]
-mod utils;
+pub mod utils;
 
 mod config;
 pub mod context;
