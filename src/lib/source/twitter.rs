@@ -136,6 +136,7 @@ async fn fetch_tweets(token: Token, entry: TwitterEntry) -> Result<(Option<u64>,
 }
 
 impl Task for TwitterActor {
+    const COLLECTION_NAME: &'static str = "twitter";
     type Entry = TwitterEntry;
     type Ctor = TwitterCtor;
 

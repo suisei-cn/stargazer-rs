@@ -34,6 +34,7 @@ pub trait TaskFieldGetter: SchedulerGetter + InfoGetter {}
 impl<T> TaskFieldGetter for T where T: SchedulerGetter + InfoGetter {}
 
 pub trait Task: TaskFieldGetter + Actor<Context = Context<Self>> + SignalHandler + Debug {
+    const COLLECTION_NAME: &'static str;
     type Entry: Debug + Serialize + DeserializeOwned + Send + Sync;
     type Ctor;
     fn query() -> Document;

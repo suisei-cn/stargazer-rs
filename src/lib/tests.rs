@@ -140,6 +140,7 @@ mod utils {
     }
 
     impl<T: StaticUnpinned, U: Copy + Eq + StaticUnpinned> Task for A<T, U> {
+        const COLLECTION_NAME: &'static str = "test_task";
         type Entry = ();
         type Ctor = ();
 
