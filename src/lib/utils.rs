@@ -107,8 +107,9 @@ macro_rules! impl_to_collector_handler {
     };
 }
 
-#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_possible_truncation, clippy::missing_panics_doc)]
 pub fn timestamp(t: SystemTime) -> i64 {
+    // SAFETY: t >= 0
     t.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64
 }
 
