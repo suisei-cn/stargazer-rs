@@ -29,53 +29,6 @@ macro_rules! o {
 }
 
 #[macro_export]
-// impl_message_target!((pub) ActorTarget, Actor)
-macro_rules! impl_message_target {
-    ( $target: ident, $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)? ) => {
-        #[derive(Debug)]
-        struct $target $(< $( $lt ),+ >)? $(($(core::marker::PhantomData<$lt>),+))?;
-
-        impl_message_target!(impl $target, $name $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)?);
-    };
-    ( pub $target: ident, $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)? ) => {
-        #[derive(Debug)]
-        pub struct $target $(< $( $lt ),+ >)? $(($(core::marker::PhantomData<$lt>),+))?;
-
-        impl_message_target!(impl $target, $name $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)?);
-    };
-    ( impl $target: ident, $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)? ) => {
-        $(
-        #[allow(dead_code)]
-        impl <$($lt),+> $target < $( $lt ),+ > {
-            pub fn new() -> Self {
-                Default::default()
-            }
-        })?
-
-        impl $(<$($lt),+>)? Default for $target $(< $( $lt ),+ >)? {
-            fn default() -> Self {
-                Self$(($( core::marker::PhantomData::<$lt> ),+))?
-            }
-        }
-
-        #[allow(clippy::expl_impl_clone_on_copy)]
-        impl $(<$($lt),+>)? Clone for $target $(< $( $lt ),+ >)? {
-            fn clone(&self) -> Self {
-                Self$(($( core::marker::PhantomData::<$lt> ),+))?
-            }
-        }
-        impl $(<$($lt),+>)? Copy for $target $(< $( $lt ),+ >)? {}
-        unsafe impl $(<$($lt),+>)? Send for $target $(< $( $lt ),+ >)? {}
-
-        impl $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $crate::context::MessageTarget for $target $(< $( $lt ),+ >)?
-        {
-            type Actor = $name $(< $( $lt ),+ >)?;
-            type Addr = actix::Addr<$name $(< $( $lt ),+ >)?>;
-        }
-    }
-}
-
-#[macro_export]
 // impl_stop_on_panic!(Actor)
 macro_rules! impl_stop_on_panic {
     ( $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)? ) => {
@@ -136,8 +89,7 @@ macro_rules! impl_to_collector_handler {
                             let holding_ownership = res.unwrap_or(Ok(false)).unwrap_or(false);
                             if holding_ownership {
                                 crate::context::ArbiterContext::with(|ctx| {
-                                    ctx.send(
-                                        crate::collector::CollectorTarget,
+                                    ctx.send::<crate::collector::CollectorActor, _>(
                                         crate::collector::Publish::new(&*msg.topic, msg.body),
                                     )
                                     .unwrap()

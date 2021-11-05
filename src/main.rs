@@ -12,7 +12,6 @@ use stargazer_lib::collector::amqp::AMQPFactory;
 use stargazer_lib::collector::debug::DebugCollectorFactory;
 use stargazer_lib::collector::CollectorActor;
 use stargazer_lib::db::{connect_db, Coll, Collection, Document};
-use stargazer_lib::scheduler::actor::ScheduleTarget;
 use stargazer_lib::scheduler::driver::ScheduleDriverActor;
 use stargazer_lib::scheduler::messages::{ActorsIter, UpdateAll};
 use stargazer_lib::scheduler::ScheduleActor;
@@ -48,19 +47,13 @@ struct Opts {
 #[get("/status")]
 async fn status(ctx: web::Data<InstanceContext>) -> impl Responder {
     // evict outdated tasks
-    ctx.send(
-        ScheduleTarget::<BililiveActor>::new(),
-        &UpdateAll::new(true),
-    )
-    .unwrap()
-    .await
-    .unwrap();
+    ctx.send::<ScheduleActor<BililiveActor>, _>(&UpdateAll::new(true))
+        .unwrap()
+        .await
+        .unwrap();
 
     let resp = ctx
-        .send(
-            ScheduleTarget::<BililiveActor>::new(),
-            &ActorsIter::new(|map| Box::pin(ready(map.len()))),
-        )
+        .send::<ScheduleActor<BililiveActor>, _>(&ActorsIter::new(|map| Box::pin(ready(map.len()))))
         .unwrap()
         .await
         .unwrap()

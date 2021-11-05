@@ -24,7 +24,6 @@ pub struct DebugActor {
 }
 impl_task_field_getter!(DebugActor, info, scheduler);
 impl_stop_on_panic!(DebugActor);
-impl_message_target!(pub DebugTarget, DebugActor);
 impl_to_collector_handler!(DebugActor);
 
 impl Actor for DebugActor {

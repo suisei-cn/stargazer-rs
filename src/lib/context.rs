@@ -90,22 +90,16 @@ impl ArbiterContext {
     /// # Errors
     ///
     /// Raise an [`Error::Context`](Error::Context) when there's no such actor in the context.
-    pub fn send<Target, Act, AddrT, MsgT>(
-        &self,
-        _target: Target,
-        msg: MsgT,
-    ) -> Result<MsgRequest<Act, MsgT>>
+    pub fn send<A, M>(&self, msg: M) -> Result<MsgRequest<A, M>>
     where
-        Target: MessageTarget<Actor = Act, Addr = AddrT>,
-        Act: Actor + Handler<MsgT>,
-        Act::Context: ToEnvelope<Act, MsgT>,
-        MsgT: Message + Send + 'static,
-        MsgT::Result: Send,
-        AddrT: 'static,
+        A: Actor + Handler<M>,
+        A::Context: ToEnvelope<A, M>,
+        M: Message + Send + 'static,
+        M::Result: Send,
     {
-        let addr: &Addr<Act> = self
+        let addr: &Addr<A> = self
             .addrs
-            .get(&TypeId::of::<AddrT>())
+            .get(&TypeId::of::<Addr<A>>())
             .ok_or(Error::Context)?
             .downcast_ref()
             .unwrap();
@@ -137,27 +131,24 @@ impl InstanceContext {
     /// # Errors
     ///
     /// Raise an [`Error::Context`](Error::Context) when there's no such actor in the context.
-    pub fn send<'a, Target, Act, AddrT, MsgT, Output>(
-        &'a self,
-        target: Target,
-        msg: &MsgT,
-    ) -> Result<impl RequestTrait<Output = StdResult<HashMap<Uuid, Output>, MailboxError>> + 'a>
+    pub fn send<A, M>(
+        &self,
+        msg: &M,
+    ) -> Result<impl RequestTrait<Output = StdResult<HashMap<Uuid, M::Result>, MailboxError>>>
     where
-        Target: MessageTarget<Actor = Act, Addr = AddrT>,
-        Act: Actor + Handler<MsgT> + Handler<GetId>,
-        Act::Context: ToEnvelope<Act, MsgT> + ToEnvelope<Act, GetId>,
-        MsgT: Message<Result = Output> + Clone + Send + Unpin + 'static,
-        AddrT: 'static,
-        Output: Send + 'a,
+        A: Actor + Handler<M> + Handler<GetId>,
+        A::Context: ToEnvelope<A, M> + ToEnvelope<A, GetId>,
+        M: Message + Clone + Send + Unpin + 'static,
+        M::Result: Send,
     {
         let arbiters = self.arbiters.read().clone();
         let ids: Vec<_> = arbiters
             .iter()
-            .map(|arbiter| arbiter.send(target, GetId))
+            .map(|arbiter| arbiter.send::<A, _>(GetId))
             .try_collect()?;
         let resps: Vec<_> = arbiters
             .iter()
-            .map(|arbiter| arbiter.send(target, msg.clone()))
+            .map(|arbiter| arbiter.send::<A, _>(msg.clone()))
             .try_collect()?;
         Ok(
             MsgRequestTuple::new(MsgRequestVec::new(ids), MsgRequestVec::new(resps)).map(
@@ -176,16 +167,14 @@ mod tests {
     use actix::Actor;
     use uuid::Uuid;
 
-    use crate::tests::{
-        Adder, AdderTarget, Echo, Echo2, Echo2Target, EchoTarget, Ping, Ping2, Val,
-    };
+    use crate::tests::{Adder, Echo, Echo2, Ping, Ping2, Val};
     use crate::{ArbiterContext, InstanceContext};
 
     #[actix::test]
     async fn must_arbiter_send() {
         let ctx = ArbiterContext::new(Uuid::new_v4()).register_addr(Echo::default().start());
         assert_eq!(
-            ctx.send(EchoTarget, Ping(41, false))
+            ctx.send::<Echo, _>(Ping(41, false))
                 .expect("unable to find addr")
                 .await
                 .expect("unable to send message"),
@@ -193,12 +182,12 @@ mod tests {
         );
 
         assert!(
-            ctx.send(Echo2Target, Ping2(42, false)).is_err(),
+            ctx.send::<Echo2, _>(Ping2(42, false)).is_err(),
             "unexpected addr"
         );
         let ctx = ctx.register_addr(Echo2::default().start());
         assert_eq!(
-            ctx.send(Echo2Target, Ping2(42, false))
+            ctx.send::<Echo2, _>(Ping2(42, false))
                 .expect("unable to find addr")
                 .await
                 .expect("unable to send message"),
@@ -214,7 +203,7 @@ mod tests {
         inst.register(arb_1);
         inst.register(arb_2);
         assert!(
-            inst.send(EchoTarget, &Ping(41, false)).is_err(),
+            inst.send::<Echo, _>(&Ping(41, false)).is_err(),
             "unexpected addr"
         );
 
@@ -228,7 +217,7 @@ mod tests {
         inst.register(arb_1);
         inst.register(arb_2);
         let ans = inst
-            .send(AdderTarget, &Val(41))
+            .send::<Adder, _>(&Val(41))
             .expect("unable to find addr")
             .await
             .expect("unable to send message");

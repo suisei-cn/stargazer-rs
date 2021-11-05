@@ -123,7 +123,6 @@ pub struct CollectorActor {
 }
 
 impl_stop_on_panic!(CollectorActor);
-impl_message_target!(pub CollectorTarget, CollectorActor);
 
 impl CollectorActor {
     pub fn new(factories: Vec<CollectorFactoryWrapped>) -> Self {
@@ -190,7 +189,7 @@ impl Handler<Wake> for CollectorActor {
                         event.map_or_else(
                             || {
                                 span().in_scope(|| {
-                                    warn!("wake but no event available. this might be a bug")
+                                    warn!("wake but no event available. this might be a bug");
                                 });
                                 // no event available
                                 AtomicResponse::new(Box::pin(ready(())))

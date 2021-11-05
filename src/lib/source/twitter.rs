@@ -52,7 +52,6 @@ pub struct TwitterActor {
 
 impl_task_field_getter!(TwitterActor, info, scheduler);
 impl_stop_on_panic!(TwitterActor);
-impl_message_target!(pub TwitterTarget, TwitterActor);
 impl_to_collector_handler!(TwitterActor);
 
 impl Actor for TwitterActor {
