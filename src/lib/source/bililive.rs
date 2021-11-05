@@ -5,9 +5,9 @@ use actix::fut::ready;
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Context, StreamHandler, WrapFuture,
 };
+use actix_bililive::{connect_with_retry, ConfigBuilder, Packet, RetryConfig, StreamError};
 use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
-use actix_bililive::{connect_with_retry, ConfigBuilder, Packet, RetryConfig, StreamError};
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, info_span, Span};
