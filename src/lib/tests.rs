@@ -16,8 +16,6 @@ pub struct Query;
 #[derive(Debug, Default)]
 pub struct Echo(pub usize);
 
-impl_message_target!(pub EchoTarget, Echo);
-
 impl Actor for Echo {
     type Context = Context<Self>;
 }
@@ -57,8 +55,6 @@ pub struct Ping2(pub usize, pub bool);
 #[derive(Debug, Default)]
 pub struct Echo2(pub usize);
 
-impl_message_target!(pub Echo2Target, Echo2);
-
 impl Actor for Echo2 {
     type Context = Context<Self>;
 }
@@ -89,8 +85,6 @@ pub struct Val(pub usize);
 
 #[derive(Debug, new)]
 pub struct Adder(pub usize);
-
-impl_message_target!(pub AdderTarget, Adder);
 
 impl Actor for Adder {
     type Context = Context<Self>;
@@ -168,8 +162,6 @@ mod utils {
         }
     }
 
-    impl_message_target!(ATarget, A<T: StaticUnpinned, U: Copy + Eq + StaticUnpinned>);
-    impl_message_target!(pub PubATarget, A<T: StaticUnpinned, U: Copy + Eq + StaticUnpinned>);
     impl_stop_on_panic!(A<T: StaticUnpinned, U: StaticUnpinned+ Copy + Eq>);
     impl_to_collector_handler!(A<T: StaticUnpinned, U: Copy + Eq + StaticUnpinned>);
     impl_task_field_getter!(A<T: StaticUnpinned, U: StaticUnpinned+ Copy + Eq>, info, scheduler);

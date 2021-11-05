@@ -66,8 +66,6 @@ where
     pub(crate) driver: Addr<ScheduleDriverActor<T>>,
 }
 
-impl_message_target!(pub ScheduleTarget, ScheduleActor<T: Task>);
-
 impl<T: Task> Debug for ScheduleActor<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StealActor")
