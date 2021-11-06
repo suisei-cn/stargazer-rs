@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::db::{Collection, DBOperation};
+use crate::db::{Collection, CollOperation};
 use crate::utils::timestamp;
 
 use super::models::{SchedulerMeta, TaskInfo};
@@ -25,7 +25,7 @@ pub struct CheckOwnershipOp {
 }
 
 #[async_trait]
-impl DBOperation for CheckOwnershipOp {
+impl CollOperation for CheckOwnershipOp {
     type Result = bool;
     type Item = TaskInfo;
 
@@ -48,7 +48,7 @@ pub struct UpdateEntryOp<T> {
 }
 
 #[async_trait]
-impl<T: Serialize + Send> DBOperation for UpdateEntryOp<T> {
+impl<T: Serialize + Send> CollOperation for UpdateEntryOp<T> {
     type Result = bool;
     type Item = Document;
 
@@ -116,7 +116,7 @@ pub struct GetAllTasksCount {
 }
 
 #[async_trait]
-impl DBOperation for GetAllTasksCount {
+impl CollOperation for GetAllTasksCount {
     type Result = u64;
     type Item = Document;
 
@@ -139,7 +139,7 @@ pub struct GetWorkerInfoOp {
 }
 
 #[async_trait]
-impl DBOperation for GetWorkerInfoOp {
+impl CollOperation for GetWorkerInfoOp {
     type Result = Vec<WorkerInfo>;
     type Item = WorkerInfo;
 
@@ -179,7 +179,7 @@ pub struct GetTasksOnWorkerOp {
 }
 
 #[async_trait]
-impl DBOperation for GetTasksOnWorkerOp {
+impl CollOperation for GetTasksOnWorkerOp {
     type Result = Vec<TaskInfo>;
     type Item = TaskInfo;
 
@@ -336,7 +336,7 @@ impl<T> ScheduleOp<T> {
 }
 
 #[async_trait]
-impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
+impl<T: DeserializeOwned + Send + Sync> CollOperation for ScheduleOp<T> {
     type Result = Option<(TaskInfo, T)>;
     type Item = Document;
 
