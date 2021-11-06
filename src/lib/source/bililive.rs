@@ -38,7 +38,7 @@ pub struct BililiveActor {
 
 impl_task_field_getter!(BililiveActor, info, scheduler);
 impl_stop_on_panic!(BililiveActor);
-impl_to_collector_handler!(BililiveActor);
+impl_to_collector_handler!(BililiveActor, entry);
 
 impl StreamHandler<Result<Packet, StreamError>> for BililiveActor {
     fn handle(&mut self, item: Result<Packet, StreamError>, ctx: &mut Self::Context) {

@@ -52,7 +52,7 @@ pub struct TwitterActor {
 
 impl_task_field_getter!(TwitterActor, info, scheduler);
 impl_stop_on_panic!(TwitterActor);
-impl_to_collector_handler!(TwitterActor);
+impl_to_collector_handler!(TwitterActor, entry);
 
 impl Actor for TwitterActor {
     type Context = Context<Self>;

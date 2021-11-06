@@ -24,7 +24,7 @@ pub struct DebugActor {
 }
 impl_task_field_getter!(DebugActor, info, scheduler);
 impl_stop_on_panic!(DebugActor);
-impl_to_collector_handler!(DebugActor);
+impl_to_collector_handler!(DebugActor, entry);
 
 impl Actor for DebugActor {
     type Context = Context<Self>;

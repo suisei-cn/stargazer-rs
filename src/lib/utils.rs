@@ -61,7 +61,7 @@ macro_rules! impl_task_field_getter {
 
 #[macro_export]
 macro_rules! impl_to_collector_handler {
-    ($Self: ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)?) => {
+    ($Self: ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)? , $entry: ident) => {
         impl<$($( $lt $( : $clt $(+ $dlt )* )? ),+ , )? Z: 'static + serde::Serialize + Send + Sync >
             actix::Handler<crate::source::ToCollector<Z>> for $Self $(< $( $lt ),+ >)?
         {
@@ -81,6 +81,7 @@ macro_rules! impl_to_collector_handler {
                 use crate::scheduler::InfoGetter;
                 use crate::scheduler::SchedulerGetter;
 
+                let root = self.$entry.root.clone();
                 Box::pin(
                     self.get_scheduler()
                         .send(crate::scheduler::messages::CheckOwnership::new(self.get_info()))
@@ -90,7 +91,7 @@ macro_rules! impl_to_collector_handler {
                             if holding_ownership {
                                 crate::context::ArbiterContext::with(|ctx| {
                                     ctx.send::<crate::collector::CollectorActor, _>(
-                                        crate::collector::Publish::new(&*msg.topic, msg.body),
+                                        crate::collector::Publish::new(root, &*msg.topic, msg.body),
                                     )
                                     .unwrap()
                                     .immediately();
