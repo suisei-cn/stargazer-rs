@@ -123,6 +123,7 @@ impl Handler<Publish> for AMQPActor {
     type Result = ResponseActFuture<Self, bool>;
 
     fn handle(&mut self, msg: Publish, _ctx: &mut Self::Context) -> Self::Result {
+        // TODO merge root metadata with payload
         let payload = serde_json::to_vec(&*msg.data).unwrap(); // TODO error handling
         Box::pin(
             self.channel

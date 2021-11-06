@@ -30,6 +30,7 @@ impl Handler<Publish> for DebugCollector {
     type Result = bool;
 
     fn handle(&mut self, msg: Publish, _ctx: &mut Self::Context) -> Self::Result {
+        // TODO merge root metadata with payload
         let output = serde_json::to_string(&*msg.data).unwrap();
         info_span!("debug").in_scope(|| info!("collected: [{}] {}", msg.topic, output));
         true

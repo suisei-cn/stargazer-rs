@@ -14,6 +14,7 @@ use serde::Serialize;
 use tracing::{debug, error, info, info_span, trace, warn, Span};
 use tracing_actix::ActorInstrument;
 
+use crate::db::DBRef;
 use crate::ArbiterContext;
 
 pub mod amqp;
@@ -27,9 +28,11 @@ fn span() -> Span {
     info_span!("collector", arb=?arb_id)
 }
 
+// TODO split msg sent to dispatcher & collector impl
 #[derive(Clone, Message)]
 #[rtype("bool")]
 pub struct Publish {
+    root: DBRef,
     topic: String,
     data: Arc<dyn erased_serde::Serialize + Send + Sync>,
 }
@@ -37,6 +40,7 @@ pub struct Publish {
 impl Debug for Publish {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Publish")
+            .field("root", &self.root)
             .field("topic", &self.topic)
             .field("data", &"...")
             .finish()
@@ -48,8 +52,9 @@ impl Publish {
     ///
     /// # Panics
     /// Panics when given `data` can't be serialized into json.
-    pub fn new<T: 'static + Serialize + Send + Sync>(topic: &str, data: T) -> Self {
+    pub fn new<T: 'static + Serialize + Send + Sync>(root: DBRef, topic: &str, data: T) -> Self {
         Self {
+            root,
             topic: topic.to_string(),
             data: Arc::new(data),
         }
