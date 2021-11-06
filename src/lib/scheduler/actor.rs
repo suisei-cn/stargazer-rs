@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use crate::common::ResponseWrapper;
 use crate::config::ScheduleConfig;
-use crate::db::{Collection, CollOperation, DBResult, Document};
+use crate::db::{CollOperation, Collection, DBResult, Document};
 
 use super::builder::{ScheduleActorBuilder, BN};
 use super::driver::{RegisterScheduler, ScheduleDriverActor};

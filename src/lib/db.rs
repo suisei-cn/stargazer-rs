@@ -15,7 +15,7 @@ use tracing::{trace, warn};
 
 use crate::utils::{CancelOnDrop, CustomGuard};
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct DBRef {
     #[serde(rename = "$ref")]
     pub collection: String,

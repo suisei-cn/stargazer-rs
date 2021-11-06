@@ -15,7 +15,7 @@ use tracing::{debug, error, info, info_span, Span};
 use tracing_actix::ActorInstrument;
 
 use crate::db::{Coll, Collection, Document};
-use crate::scheduler::{Task, TaskInfo};
+use crate::scheduler::{Entry, Task, TaskInfo};
 use crate::source::ToCollector;
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
@@ -29,7 +29,7 @@ pub struct BililiveEntry {
 
 #[derive(Debug, Clone, SignalHandler)]
 pub struct BililiveActor {
-    uid: u64,
+    entry: Entry<BililiveEntry>,
     schedule_config: ScheduleConfig,
     collection: Collection<Document>,
     info: TaskInfo,
@@ -66,7 +66,7 @@ impl Actor for BililiveActor {
             info!("started");
         });
 
-        let uid = self.uid;
+        let uid = self.entry.data.uid;
         ctx.spawn(
             ready(())
                 .into_actor(self)
@@ -113,14 +113,14 @@ impl Task for BililiveActor {
     }
 
     fn construct(
-        entry: Self::Entry,
+        entry: Entry<Self::Entry>,
         ctor: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
         collection: Collection<Document>,
     ) -> Self {
         Self {
-            uid: entry.uid,
+            entry,
             schedule_config: ctor,
             collection,
             info,
@@ -130,7 +130,7 @@ impl Task for BililiveActor {
 
     fn span(&self) -> Span {
         let task_id = self.info.uuid;
-        let uid = self.uid;
+        let uid = self.entry.data.uid;
         info_span!("bililive", ?task_id, uid)
     }
 }

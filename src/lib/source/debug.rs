@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, info_span, Span};
 
 use crate::db::{Coll, Collection, Document};
-use crate::scheduler::{Task, TaskInfo};
+use crate::scheduler::{Entry, Task, TaskInfo};
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
 
@@ -17,7 +17,7 @@ pub struct DebugEntry {
 
 #[derive(Debug, Clone, SignalHandler)]
 pub struct DebugActor {
-    entry: DebugEntry,
+    entry: Entry<DebugEntry>,
     schedule_config: ScheduleConfig,
     info: TaskInfo,
     scheduler: Scheduler<Self>,
@@ -52,7 +52,7 @@ impl Task for DebugActor {
     }
 
     fn construct(
-        entry: Self::Entry,
+        entry: Entry<Self::Entry>,
         ctor: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
@@ -68,7 +68,7 @@ impl Task for DebugActor {
 
     fn span(&self) -> Span {
         let task_id = self.info.uuid;
-        let entry_id = self.entry.id;
+        let entry_id = self.entry.data.id;
         info_span!("debug", ?task_id, entry_id)
     }
 }

@@ -5,7 +5,7 @@ use actix_signal::SignalHandler;
 use tracing::{info_span, Span};
 
 use crate::db::{Collection, Document};
-use crate::scheduler::{Task, TaskFieldGetter};
+use crate::scheduler::{Entry, Task, TaskFieldGetter};
 use crate::utils::Scheduler;
 
 use super::models::TaskInfo;
@@ -33,7 +33,7 @@ impl Task for DummyTask {
     }
 
     fn construct(
-        _entry: Self::Entry,
+        _entry: Entry<Self::Entry>,
         _ctor: Self::Ctor,
         _scheduler: Scheduler<Self>,
         _info: TaskInfo,

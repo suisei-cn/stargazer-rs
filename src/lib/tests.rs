@@ -116,7 +116,7 @@ mod utils {
     use tracing::Span;
 
     use crate::db::{Collection, Document};
-    use crate::scheduler::{Task, TaskInfo};
+    use crate::scheduler::{Entry, Task, TaskInfo};
     use crate::utils::Scheduler;
 
     pub trait StaticUnpinned: 'static + Unpin {}
@@ -149,7 +149,7 @@ mod utils {
         }
 
         fn construct(
-            _: Self::Entry,
+            _: Entry<Self::Entry>,
             _: Self::Ctor,
             _: Scheduler<Self>,
             _: TaskInfo,

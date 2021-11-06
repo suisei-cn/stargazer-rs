@@ -16,7 +16,7 @@ use tracing_actix::ActorInstrument;
 
 use crate::db::{Coll, Collection, Document};
 use crate::scheduler::messages::UpdateEntry;
-use crate::scheduler::{Task, TaskInfo};
+use crate::scheduler::{Entry, Task, TaskInfo};
 use crate::source::ToCollector;
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
@@ -43,7 +43,7 @@ pub struct Tweet {
 #[derive(Debug, Clone, SignalHandler)]
 pub struct TwitterActor {
     token: Token,
-    entry: TwitterEntry,
+    entry: Entry<TwitterEntry>,
     schedule_config: ScheduleConfig,
     collection: Collection<Document>,
     info: TaskInfo,
@@ -64,7 +64,7 @@ impl Actor for TwitterActor {
 
         ctx.run_interval(self.schedule_config.max_interval / 2, |act, ctx| {
             let token = act.token.clone();
-            let entry = act.entry;
+            let entry = act.entry.data;
             ctx.spawn(
                 fetch_tweets(token, entry)
                     .into_actor(act)
@@ -74,7 +74,7 @@ impl Actor for TwitterActor {
                                 if !tweets.is_empty() {
                                     ctx.notify(ToCollector::new("twitter", tweets));
                                 }
-                                act.entry.since = since;
+                                act.entry.data.since = since;
                                 Box::pin(
                                     act.scheduler
                                         .send(UpdateEntry::new(act.info, TwitterSince { since }))
@@ -145,7 +145,7 @@ impl Task for TwitterActor {
     }
 
     fn construct(
-        entry: Self::Entry,
+        entry: Entry<Self::Entry>,
         ctor: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
@@ -163,7 +163,7 @@ impl Task for TwitterActor {
 
     fn span(&self) -> Span {
         let task_id = self.info.uuid;
-        let uid = self.entry.uid;
+        let uid = self.entry.data.uid;
         info_span!("twitter", ?task_id, uid)
     }
 }

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::db::{Collection, CollOperation};
+use crate::db::{CollOperation, Collection};
 use crate::utils::timestamp;
 
 use super::models::{SchedulerMeta, TaskInfo};
