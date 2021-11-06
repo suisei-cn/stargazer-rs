@@ -19,6 +19,7 @@ use tracing_test::traced_test;
 use crate::collector::amqp::AMQPFactory;
 use crate::collector::debug::DebugCollectorFactory;
 use crate::collector::{CollectorFactory, Publish};
+use crate::db::DBRef;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 struct TestMsg {
@@ -44,7 +45,15 @@ async fn must_debug_collector() {
     };
     assert!(
         collector
-            .send(Publish::new("blabla", msg.clone()))
+            .send(Publish::new(
+                DBRef {
+                    collection: String::new(),
+                    id: Default::default(),
+                    db: None,
+                },
+                "blabla",
+                msg.clone(),
+            ))
             .await
             .expect("mailbox error"),
         "unable to publish event"
@@ -164,7 +173,15 @@ async fn must_amqp_publish(uri: &'static str) {
     };
     assert!(
         collector
-            .send(Publish::new("blabla", msg.clone()))
+            .send(Publish::new(
+                DBRef {
+                    collection: String::new(),
+                    id: Default::default(),
+                    db: None,
+                },
+                "blabla",
+                msg.clone(),
+            ))
             .await
             .expect("mailbox error"),
         "unable to publish event"

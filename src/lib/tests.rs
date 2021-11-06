@@ -126,6 +126,7 @@ mod utils {
         _marker_1: PhantomData<(T, U)>,
         _marker_2: Rc<()>,
         info: TaskInfo,
+        entry: Entry<()>,
         scheduler: Scheduler<Self>,
     }
 
@@ -164,6 +165,6 @@ mod utils {
     }
 
     impl_stop_on_panic!(A<T: StaticUnpinned, U: StaticUnpinned+ Copy + Eq>);
-    impl_to_collector_handler!(A<T: StaticUnpinned, U: Copy + Eq + StaticUnpinned>);
+    impl_to_collector_handler!(A<T: StaticUnpinned, U: Copy + Eq + StaticUnpinned>, entry);
     impl_task_field_getter!(A<T: StaticUnpinned, U: StaticUnpinned+ Copy + Eq>, info, scheduler);
 }
