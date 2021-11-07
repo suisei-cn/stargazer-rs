@@ -12,6 +12,7 @@ use stargazer_lib::collector::amqp::AMQPFactory;
 use stargazer_lib::collector::debug::DebugCollectorFactory;
 use stargazer_lib::collector::CollectorActor;
 use stargazer_lib::db::{connect_db, Coll, Collection, Document};
+use stargazer_lib::manager::{Manager, Vtuber};
 use stargazer_lib::o;
 use stargazer_lib::scheduler::driver::ScheduleDriverActor;
 use stargazer_lib::scheduler::messages::{ActorsIter, UpdateAll};
@@ -69,14 +70,16 @@ async fn main() {
     let bililive_config = source_config.bililive;
     let debug_source_config = source_config.debug;
 
-    let db = connect_db(config.mongodb.uri(), config.mongodb.database())
+    let database = connect_db(config.mongodb.uri(), config.mongodb.database())
         .await
         .expect("unable to connect to db");
 
     // TODO --- remove this part of code cuz they will be replaced by central metadata actor
-    let coll_bililive: Collection<Document> = db.collection("bililive");
-    let coll_twitter: Collection<Document> = db.collection("twitter");
-    let coll_debug: Collection<Document> = db.collection("debug");
+    let coll_bililive: Collection<Document> = database.collection("bililive");
+    let coll_twitter: Collection<Document> = database.collection("twitter");
+    let coll_debug: Collection<Document> = database.collection("debug");
+
+    let coll_vtuber: Collection<Vtuber> = database.collection("vtuber");
 
     let arc_coll_bililive: Arc<Coll<BililiveColl>> = Arc::new(Coll::new(coll_bililive.clone()));
     let arc_coll_twitter: Arc<Coll<TwitterColl>> = Arc::new(Coll::new(coll_twitter.clone()));
@@ -87,13 +90,16 @@ async fn main() {
     let twitter_driver = ScheduleDriverActor::new(sched_config).start();
     let debug_driver = ScheduleDriverActor::new(sched_config).start();
     Server::new(move |instance_id| {
+        let database = database.clone();
+        let coll_vtuber = coll_vtuber.clone();
+
         let collector_config = collector_config.clone();
         let ctx = ArbiterContext::new(instance_id);
 
         let bililive_actor: Option<ScheduleActor<BililiveActor>> = if bililive_config.enabled {
             Some(
                 ScheduleActor::builder()
-                    .db(&db)
+                    .db(&database)
                     .ctor_builder(ScheduleConfig::default)
                     .config(sched_config)
                     .driver(bililive_driver.clone())
@@ -108,7 +114,7 @@ async fn main() {
                 let token = token.clone();
                 Some(
                     ScheduleActor::builder()
-                        .db(&db)
+                        .db(&database)
                         .ctor_builder(move || TwitterCtor::new(sched_config, &*token))
                         .config(sched_config)
                         .driver(twitter_driver.clone())
@@ -121,7 +127,7 @@ async fn main() {
         let debug_actor: Option<ScheduleActor<DebugActor>> = if debug_source_config.enabled {
             Some(
                 ScheduleActor::builder()
-                    .db(&db)
+                    .db(&database)
                     .ctor_builder(ScheduleConfig::default)
                     .config(sched_config)
                     .driver(debug_driver.clone())
@@ -152,6 +158,12 @@ async fn main() {
         let arc_coll_bililive = arc_coll_bililive.clone();
         let arc_coll_twitter = arc_coll_twitter.clone();
         let arc_coll_debug = arc_coll_debug.clone();
+
+        let manager = Manager::new(database, coll_vtuber)
+            .register::<BililiveActor>()
+            .register::<TwitterActor>()
+            .register::<DebugActor>();
+
         // register actor addrs
         (ctx.register_addr(collector_addr), move |cfg| {
             cfg.app_data(Data::from(arc_coll_bililive))
@@ -160,7 +172,8 @@ async fn main() {
                 .service(status)
                 .service(web::scope("/bililive").service(stargazer_lib::source::bililive::set))
                 .service(web::scope("/twitter").service(stargazer_lib::source::twitter::set))
-                .service(web::scope("/debug").service(stargazer_lib::source::debug::set));
+                .service(web::scope("/debug").service(stargazer_lib::source::debug::set))
+                .service(manager.build("/manage"));
         })
     })
     .workers(config.basic.workers)

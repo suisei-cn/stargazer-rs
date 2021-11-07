@@ -43,7 +43,7 @@ impl Actor for DebugActor {
 }
 
 impl Task for DebugActor {
-    const COLLECTION_NAME: &'static str = "debug";
+    const NAMESPACE: &'static str = "debug";
     type Entry = DebugEntry;
     type Ctor = ScheduleConfig;
 

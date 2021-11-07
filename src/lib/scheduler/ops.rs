@@ -29,9 +29,7 @@ impl CollOperation for CheckOwnershipOp {
     type Result = bool;
     type Item = TaskInfo;
 
-    fn desc() -> &'static str {
-        "CheckOwnership"
-    }
+    const DESC: &'static str = "CheckOwnership";
 
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         collection
@@ -52,9 +50,7 @@ impl<T: Serialize + Send> CollOperation for UpdateEntryOp<T> {
     type Result = bool;
     type Item = Document;
 
-    fn desc() -> &'static str {
-        "UpdateEntry"
-    }
+    const DESC: &'static str = "UpdateEntry";
 
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let mut body = if let Some(body) = &self.body {
@@ -120,9 +116,7 @@ impl CollOperation for GetAllTasksCount {
     type Result = u64;
     type Item = Document;
 
-    fn desc() -> &'static str {
-        "GetAllTasksCount"
-    }
+    const DESC: &'static str = "GetAllTasksCount";
 
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         collection
@@ -143,9 +137,7 @@ impl CollOperation for GetWorkerInfoOp {
     type Result = Vec<WorkerInfo>;
     type Item = WorkerInfo;
 
-    fn desc() -> &'static str {
-        "GetWorkerInfo"
-    }
+    const DESC: &'static str = "GetWorkerInfo";
 
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let filter_query = doc! {
@@ -183,9 +175,7 @@ impl CollOperation for GetTasksOnWorkerOp {
     type Result = Vec<TaskInfo>;
     type Item = TaskInfo;
 
-    fn desc() -> &'static str {
-        "GetTasksOnWorker"
-    }
+    const DESC: &'static str = "GetTasksOnWorker";
 
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let filter_query = doc! {
@@ -340,9 +330,7 @@ impl<T: DeserializeOwned + Send + Sync> CollOperation for ScheduleOp<T> {
     type Result = Option<(TaskInfo, T)>;
     type Item = Document;
 
-    fn desc() -> &'static str {
-        "Schedule"
-    }
+    const DESC: &'static str = "Schedule";
 
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         Ok(match self.mode {

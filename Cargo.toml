@@ -26,6 +26,7 @@ derive-new = "0.5"
 dirs = "4.0"
 egg-mode = { version = "0.16", default-features = false, features = ["rustls_webpki"] }
 figment = { version = "0.10", features = ["toml", "json", "env"] }
+frunk_core = "0.4"
 futures = "0.3"
 getset = "0.1"
 humantime-serde = "1.0"

@@ -24,7 +24,7 @@ impl Actor for DummyTask {
 }
 
 impl Task for DummyTask {
-    const COLLECTION_NAME: &'static str = "dummy";
+    const NAMESPACE: &'static str = "dummy";
     type Entry = ();
     type Ctor = ();
 

@@ -104,7 +104,7 @@ impl Actor for BililiveActor {
 }
 
 impl Task for BililiveActor {
-    const COLLECTION_NAME: &'static str = "bililive";
+    const NAMESPACE: &'static str = "bililive";
     type Entry = BililiveEntry;
     type Ctor = ScheduleConfig;
 

@@ -26,38 +26,86 @@ pub struct DBRef {
 }
 
 impl DBRef {
-    pub fn lookup<T>(&self) -> DBRefLookupOp<T> {
-        DBRefLookupOp(self, PhantomData)
+    pub const fn get<T>(&self) -> DBRefGetOp<T> {
+        DBRefGetOp(self, PhantomData)
+    }
+    // TODO DBRefUpdateOp ?
+    pub const fn set<T>(&self, data: T) -> DBRefSetOp<T> {
+        DBRefSetOp(self, data)
+    }
+    pub const fn del<T>(&self) -> DBRefDelOp<T> {
+        DBRefDelOp(self, PhantomData)
+    }
+}
+
+fn assert_not_cross_db(db_ref: &DBRef, db_target: &Database) {
+    if let Some(name) = &db_ref.db {
+        assert_eq!(
+            name,
+            db_target.name(),
+            "cross db reference is not supported"
+        );
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct DBRefLookupOp<'a, T>(&'a DBRef, PhantomData<T>);
+pub struct DBRefGetOp<'a, T>(&'a DBRef, PhantomData<T>);
 
 #[async_trait]
-impl<T> DBOperation for DBRefLookupOp<'_, T>
+impl<T> DBOperation for DBRefGetOp<'_, T>
 where
     T: DeserializeOwned + Send + Sync + Unpin,
 {
     type Result = Option<T>;
 
-    fn desc() -> &'static str {
-        "DBRefLookup"
-    }
+    const DESC: &'static str = "DBRefGet";
 
     async fn execute_impl(self, db: &Database) -> DBResult<Option<T>> {
-        if self
-            .0
-            .db
-            .as_ref()
-            .map(|name| db.name() != name)
-            .unwrap_or(false)
-        {
-            panic!("cross db reference not supported");
-        }
+        assert_not_cross_db(self.0, db);
         db.collection(self.0.collection.as_ref())
             .find_one(doc! {"_id": self.0.id}, None)
             .await
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct DBRefSetOp<'a, T>(&'a DBRef, T);
+
+#[async_trait]
+impl<T> DBOperation for DBRefSetOp<'_, T>
+where
+    T: Serialize + DeserializeOwned + Send + Sync + Unpin,
+{
+    type Result = Option<T>;
+
+    const DESC: &'static str = "DBRefSet";
+
+    async fn execute_impl(self, db: &Database) -> DBResult<Option<T>> {
+        assert_not_cross_db(self.0, db);
+        db.collection(self.0.collection.as_ref())
+            .find_one_and_replace(doc! {"_id": self.0.id}, self.1, None)
+            .await
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct DBRefDelOp<'a, T>(&'a DBRef, PhantomData<T>);
+
+#[async_trait]
+impl<T> DBOperation for DBRefDelOp<'_, T>
+where
+    T: DeserializeOwned + Send + Sync + Unpin,
+{
+    type Result = bool;
+
+    const DESC: &'static str = "DBRefDel";
+
+    async fn execute_impl(self, db: &Database) -> DBResult<bool> {
+        assert_not_cross_db(self.0, db);
+        db.collection::<Document>(self.0.collection.as_ref())
+            .delete_one(doc! {"_id": self.0.id}, None)
+            .await
+            .map(|res| res.deleted_count > 0)
     }
 }
 
@@ -80,16 +128,16 @@ impl<T> Deref for Coll<T> {
 pub trait CollOperation: Sized {
     type Result;
     type Item: Send + Sync;
-    fn desc() -> &'static str;
+    const DESC: &'static str;
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result>;
     async fn execute<T: Sync>(self, collection: &Collection<T>) -> DBResult<Self::Result> {
         let _timeout_guard = CancelOnDrop::new(actix::spawn(async {
             actix_rt::time::sleep(Duration::from_secs(1)).await;
-            warn!("{} coll op blocked for more than 1 secs", Self::desc());
+            warn!("{} coll op blocked for more than 1 secs", Self::DESC);
         }));
-        let _log_guard = CustomGuard::new(|| trace!("{} coll op completed", Self::desc()));
+        let _log_guard = CustomGuard::new(|| trace!("{} coll op completed", Self::DESC));
 
-        trace!("{} coll op started", Self::desc());
+        trace!("{} coll op started", Self::DESC);
         self.execute_impl(&collection.clone_with_type()).await
     }
 }
@@ -97,16 +145,16 @@ pub trait CollOperation: Sized {
 #[async_trait]
 pub trait DBOperation: Sized {
     type Result;
-    fn desc() -> &'static str;
+    const DESC: &'static str;
     async fn execute_impl(self, db: &Database) -> DBResult<Self::Result>;
     async fn execute(self, db: &Database) -> DBResult<Self::Result> {
         let _timeout_guard = CancelOnDrop::new(actix::spawn(async {
             actix_rt::time::sleep(Duration::from_secs(1)).await;
-            warn!("{} db op blocked for more than 1 secs", Self::desc());
+            warn!("{} db op blocked for more than 1 secs", Self::DESC);
         }));
-        let _log_guard = CustomGuard::new(|| trace!("{} db op completed", Self::desc()));
+        let _log_guard = CustomGuard::new(|| trace!("{} db op completed", Self::DESC));
 
-        trace!("{} db op started", Self::desc());
+        trace!("{} db op started", Self::DESC);
         self.execute(db).await
     }
 }

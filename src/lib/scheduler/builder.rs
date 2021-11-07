@@ -43,7 +43,7 @@ where
 {
     pub fn db(self, db: &Database) -> ScheduleActorBuilder<T, BF, CTOR, CONF, DRV> {
         ScheduleActorBuilder {
-            collection: Some(db.collection(T::COLLECTION_NAME)),
+            collection: Some(db.collection(T::NAMESPACE)),
             ctor_builder: self.ctor_builder,
             config: self.config,
             driver: self.driver,
