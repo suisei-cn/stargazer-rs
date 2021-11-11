@@ -17,6 +17,7 @@ mod field_getter;
 mod field_setter;
 mod models;
 mod ops;
+mod utils;
 
 #[derive(Debug)]
 pub struct Source<T>(PhantomData<T>);

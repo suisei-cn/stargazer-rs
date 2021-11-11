@@ -30,6 +30,7 @@ frunk_core = "0.4"
 futures = "0.3"
 getset = "0.1"
 humantime-serde = "1.0"
+hmap-serde = "0.1.0-alpha.2"
 itertools = "0.10"
 lapin = { version = "1.9", default-features = false, features = ["rustls-webpki-roots-certs"] }
 mongodb = { version = "2.1.0", features = ["bson-uuid-0_8"] }

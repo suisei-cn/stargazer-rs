@@ -1210,6 +1210,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hmap-serde"
+version = "0.1.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62f6ab2c0f5c6fde49827ff0e8c7325f3bdd54d94e7cf38524951d5079a7545b"
+dependencies = [
+ "derive_more",
+ "frunk_core",
+ "ref-cast",
+ "serde",
+]
+
+[[package]]
 name = "hostname"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1993,6 +2005,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "ref-cast"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "300f2a835d808734ee295d45007adacb9ebb29dd3ae2424acfa17930cae541da"
+dependencies = [
+ "ref-cast-impl",
+]
+
+[[package]]
+name = "ref-cast-impl"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c38e3aecd2b21cb3959637b883bb3714bc7e43f0268b9a29d3743ee3e55cdd2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "regex"
 version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2380,6 +2412,7 @@ dependencies = [
  "frunk_core",
  "futures",
  "getset",
+ "hmap-serde",
  "humantime-serde",
  "itertools",
  "lapin",
