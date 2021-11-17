@@ -2,6 +2,7 @@ use actix::Actor;
 use actix_signal::SignalHandler;
 use derive_new::new;
 use mongodb::bson::oid::ObjectId;
+use mongodb::bson::serde_helpers::uuid_as_binary;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -11,7 +12,9 @@ use super::actor::ScheduleContext;
 pub struct TaskInfo {
     #[serde(rename = "_id")]
     pub doc_id: ObjectId,
+    #[serde(with = "uuid_as_binary")]
     pub uuid: Uuid,
+    #[serde(with = "uuid_as_binary")]
     pub parent_uuid: Uuid,
 }
 
