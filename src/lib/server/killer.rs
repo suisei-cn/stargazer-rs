@@ -1,10 +1,10 @@
 use actix::{Actor, Context, Handler, Message, Supervised, System, SystemService};
-use actix_web::dev::Server as ActixServer;
+use actix_web::dev::ServerHandle;
 use derive_new::new;
 
 #[derive(Debug, Clone, Message, new)]
 #[rtype("()")]
-pub struct RegisterHttpServer(ActixServer);
+pub struct RegisterHttpServer(ServerHandle);
 
 #[derive(Debug, Copy, Clone, Message, new)]
 #[rtype("()")]
@@ -13,7 +13,7 @@ pub struct Kill {
 }
 
 #[derive(Debug, Default)]
-pub struct KillerActor(Option<ActixServer>);
+pub struct KillerActor(Option<ServerHandle>);
 
 impl KillerActor {
     pub fn new() -> Self {

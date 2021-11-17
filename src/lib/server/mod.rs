@@ -166,7 +166,7 @@ where
                 .bind(port)?
                 .run();
 
-                KillerActor::from_registry().do_send(RegisterHttpServer::new(srv.clone()));
+                KillerActor::from_registry().do_send(RegisterHttpServer::new(srv.handle()));
                 Ok(ServerHandler::HTTP(srv))
             }
         }
