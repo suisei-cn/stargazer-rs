@@ -52,4 +52,4 @@ uuid = { version = "0.8", features = ["v4"] }
 [dev-dependencies]
 figment = { version = "0.10", features = ["toml", "json", "env", "test"] }
 testcontainers = "0.12"
-tracing-test = "0.1"
+tracing-test = "0.2"
