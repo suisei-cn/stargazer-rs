@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
+use bson::serde_helpers::uuid_as_binary;
 use derive_new::new;
 use futures::{StreamExt, TryStreamExt};
 use mongodb::bson::{self, bson, doc, Document};
@@ -98,7 +99,7 @@ enum ScheduleResult<T> {
 
 #[derive(Debug, Copy, Clone, Deserialize, Eq, PartialEq)]
 pub struct WorkerInfo {
-    #[serde(rename = "_id")]
+    #[serde(rename = "_id", with = "uuid_as_binary")]
     id: Uuid,
     count: u64,
 }
@@ -225,8 +226,8 @@ impl<T> ScheduleOp<T> {
         let update = doc! {
             "$set": {
                 "timestamp": now_ts,
-                "uuid": uuid.to_string(),
-                "parent_uuid": parent_meta.id.to_string()
+                "uuid": bson::Uuid::from(uuid),
+                "parent_uuid": bson::Uuid::from(parent_meta.id)
             }
         };
         Self {
