@@ -1211,13 +1211,11 @@ dependencies = [
 
 [[package]]
 name = "hmap-serde"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62f6ab2c0f5c6fde49827ff0e8c7325f3bdd54d94e7cf38524951d5079a7545b"
+checksum = "4b744a929671d06288f3ecd044cf464f1a378f78e482ed7e7b12f56119bbdfad"
 dependencies = [
- "derive_more",
  "frunk_core",
- "ref-cast",
  "serde",
 ]
 
@@ -2005,26 +2003,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ref-cast"
-version = "1.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "300f2a835d808734ee295d45007adacb9ebb29dd3ae2424acfa17930cae541da"
-dependencies = [
- "ref-cast-impl",
-]
-
-[[package]]
-name = "ref-cast-impl"
-version = "1.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c38e3aecd2b21cb3959637b883bb3714bc7e43f0268b9a29d3743ee3e55cdd2"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "regex"
 version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2424,6 +2402,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
+ "tap",
  "testcontainers",
  "thiserror",
  "tokio",
@@ -2534,6 +2513,12 @@ name = "take_mut"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f764005d11ee5f36500a149ace24e00e3da98b0158b3e2d53a7495660d3f4d60"
+
+[[package]]
+name = "tap"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tcp-stream"

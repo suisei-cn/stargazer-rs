@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 
 use actix::{Arbiter, SystemService};
 use actix_web::dev::Server as WebServer;
-use actix_web::middleware::Logger;
+use actix_web::middleware::{Logger, NormalizePath};
 use actix_web::web::{Data, ServiceConfig};
 use actix_web::App;
 use actix_web::HttpServer;
@@ -158,6 +158,7 @@ where
                     instance_ctx.register(ctx.clone());
                     App::new()
                         .wrap(Logger::default())
+                        .wrap(NormalizePath::trim())
                         .app_data(Data::new(ctx))
                         .app_data(Data::from(instance_ctx))
                         .configure(http_services)

@@ -113,6 +113,8 @@ mod utils {
 
     use actix::{Actor, Context};
     use actix_signal::SignalHandler;
+    use hmap_serde::Labelled;
+    use serde::{Deserialize, Serialize};
     use tracing::Span;
 
     use crate::db::{Collection, Document};
@@ -140,9 +142,15 @@ mod utils {
         type Context = Context<Self>;
     }
 
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct AEntry;
+
+    impl Labelled for AEntry {
+        const KEY: &'static str = "test_task";
+    }
+
     impl<T: StaticUnpinned, U: Copy + Eq + StaticUnpinned> Task for A<T, U> {
-        const NAMESPACE: &'static str = "test_task";
-        type Entry = ();
+        type Entry = AEntry;
         type Ctor = ();
 
         fn query() -> Document {

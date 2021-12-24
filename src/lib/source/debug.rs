@@ -1,6 +1,7 @@
 use actix::{Actor, Context};
 use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
+use hmap_serde::Labelled;
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, info_span, Span};
@@ -42,8 +43,11 @@ impl Actor for DebugActor {
     }
 }
 
+impl Labelled for DebugEntry {
+    const KEY: &'static str = "debug";
+}
+
 impl Task for DebugActor {
-    const NAMESPACE: &'static str = "debug";
     type Entry = DebugEntry;
     type Ctor = ScheduleConfig;
 

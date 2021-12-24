@@ -9,6 +9,7 @@ use actix_bililive::errors::StreamError;
 use actix_bililive::{connect_with_retry, ConfigBuilder, Packet, RetryConfig};
 use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
+use hmap_serde::Labelled;
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, info_span, Span};
@@ -103,8 +104,11 @@ impl Actor for BililiveActor {
     }
 }
 
+impl Labelled for BililiveEntry {
+    const KEY: &'static str = "bililive";
+}
+
 impl Task for BililiveActor {
-    const NAMESPACE: &'static str = "bililive";
     type Entry = BililiveEntry;
     type Ctor = ScheduleConfig;
 

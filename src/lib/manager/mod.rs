@@ -1,26 +1,34 @@
 use std::marker::PhantomData;
 
 use actix_web::web::Data;
-use actix_web::Scope;
+use actix_web::{web, Scope};
 use frunk_core::hlist::{HCons, HFoldLeftable, HNil};
 use frunk_core::traits::Poly;
+use hmap_serde::{HLabelledMap, Labelled};
 use mongodb::{Collection, Database};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use tap::Pipe;
 
-use field_getter::FoldFieldGetter;
-use field_setter::FoldFieldSetter;
+use field::FoldFieldEp;
 pub use models::Vtuber;
+use utils::ToOptionHList;
 
 use crate::scheduler::Task;
 
+mod entry;
 mod errors;
-mod field_getter;
-mod field_setter;
+mod field;
 mod models;
 mod ops;
 mod utils;
 
 #[derive(Debug)]
 pub struct Source<T>(PhantomData<T>);
+
+impl<T: Task> Labelled for Source<T> {
+    const KEY: &'static str = T::Entry::KEY;
+}
 
 impl<T> Default for Source<T> {
     fn default() -> Self {
@@ -67,22 +75,23 @@ impl<L> Manager<L> {
 
 impl<L> Manager<L>
 where
-    L: HFoldLeftable<Poly<FoldFieldGetter>, Scope, Output = Scope>
-        + HFoldLeftable<Poly<FoldFieldSetter>, Scope, Output = Scope>
-        + Copy,
+    L: HFoldLeftable<Poly<FoldFieldEp>, Scope, Output = Scope> + ToOptionHList + Copy + 'static,
+    HLabelledMap<L::OptionHList>: Serialize + DeserializeOwned,
+    L::OptionHList: 'static,
 {
     #[allow(clippy::similar_names)]
     pub fn build(self, prefix: &str) -> Scope {
-        let field_getter_scope = self
-            .sources
-            .foldl(Poly(FoldFieldGetter), Scope::new("/{vtuber}"));
-        let field_setter_scope = self
-            .sources
-            .foldl(Poly(FoldFieldSetter), Scope::new("/{vtuber}"));
+        let vtuber_scope = web::scope("/{vtuber}")
+            .pipe(|scope| self.sources.foldl(Poly(FoldFieldEp), scope))
+            .service(
+                web::resource("")
+                    .route(web::get().to(entry::get::<L>))
+                    .route(web::delete().to(entry::delete)),
+            );
         Scope::new(prefix)
             .app_data(Data::new(self.db))
             .app_data(Data::new(self.coll))
-            .service(field_getter_scope)
-            .service(field_setter_scope)
+            .service(web::resource("").route(web::post().to(entry::create)))
+            .service(vtuber_scope)
     }
 }

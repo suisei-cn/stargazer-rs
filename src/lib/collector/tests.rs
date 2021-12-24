@@ -60,7 +60,7 @@ async fn must_debug_collector() {
     );
 
     assert!(logs_contain("[blabla]"), "no topic found");
-    assert!(logs_contain(serde_json::to_string(&msg).unwrap().as_str()))
+    assert!(logs_contain(serde_json::to_string(&msg).unwrap().as_str()));
 }
 
 #[actix::test]
@@ -189,11 +189,13 @@ async fn must_amqp_publish(uri: &'static str) {
 
     tokio::time::sleep(Duration::from_millis(100)).await;
     stop_tx.send(()).unwrap();
-    let received_msgs_ref = received_msgs.borrow();
-    assert_eq!(received_msgs_ref.len(), 1);
-    let received_msg: TestMsg = serde_json::from_slice(&*received_msgs_ref.first().unwrap())
-        .expect("unable to deserialize msg");
-    assert_eq!(msg, received_msg);
+    {
+        let received_msgs_ref = received_msgs.borrow();
+        assert_eq!(received_msgs_ref.len(), 1);
+        let received_msg: TestMsg = serde_json::from_slice(&*received_msgs_ref.first().unwrap())
+            .expect("unable to deserialize msg");
+        assert_eq!(msg, received_msg);
+    }
 
     handler.await.unwrap();
 }

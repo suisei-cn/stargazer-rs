@@ -8,6 +8,7 @@ use egg_mode::entities::MediaType;
 use egg_mode::error::Result;
 use egg_mode::user::UserID;
 use egg_mode::{tweet, Token};
+use hmap_serde::Labelled;
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::Span;
@@ -135,8 +136,11 @@ async fn fetch_tweets(token: Token, entry: TwitterEntry) -> Result<(Option<u64>,
     ))
 }
 
+impl Labelled for TwitterEntry {
+    const KEY: &'static str = "twitter";
+}
+
 impl Task for TwitterActor {
-    const NAMESPACE: &'static str = "twitter";
     type Entry = TwitterEntry;
     type Ctor = TwitterCtor;
 

@@ -149,3 +149,14 @@ where
         (self.on_exit)();
     }
 }
+
+pub trait BoolExt {
+    #[allow(clippy::missing_errors_doc)]
+    fn true_or<E>(self, e: E) -> Result<(), E>;
+}
+
+impl BoolExt for bool {
+    fn true_or<E>(self, e: E) -> Result<(), E> {
+        self.then(|| ()).ok_or(e)
+    }
+}

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use derive_new::new;
 use erased_serde::private::serde::Serialize;
@@ -26,6 +28,52 @@ impl CollOperation for GetVtuberOp {
 }
 
 #[derive(Debug, new)]
+pub struct CreateVtuberOp {
+    name: String,
+}
+
+#[async_trait]
+impl CollOperation for CreateVtuberOp {
+    type Result = ();
+    type Item = Vtuber;
+
+    const DESC: &'static str = "CreateVtuber";
+
+    async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
+        collection
+            .insert_one(
+                Vtuber {
+                    name: self.name,
+                    fields: HashMap::new(),
+                },
+                None,
+            )
+            .await
+            .map(|_| ())
+    }
+}
+
+#[derive(Debug, new)]
+pub struct DeleteVtuberOp {
+    name: String,
+}
+
+#[async_trait]
+impl CollOperation for DeleteVtuberOp {
+    type Result = bool;
+    type Item = Vtuber;
+
+    const DESC: &'static str = "CreateVtuber";
+
+    async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
+        collection
+            .delete_one(doc! {"name": self.name}, None)
+            .await
+            .map(|res| res.deleted_count > 0)
+    }
+}
+
+#[derive(Debug, new)]
 pub struct CreateFieldOp<T>(T);
 
 #[async_trait]
@@ -50,7 +98,7 @@ where
 pub struct LinkRefOp {
     name: String,
     field: &'static str,
-    db_ref: DBRef,
+    db_ref: Option<DBRef>,
 }
 
 #[async_trait]
@@ -60,16 +108,33 @@ impl CollOperation for LinkRefOp {
     const DESC: &'static str = "LinkRef";
 
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
-        let mut update_doc = Document::new();
-        update_doc.insert(self.field, bson::to_bson(&self.db_ref).unwrap());
+        let field = self.field;
+        let update_doc = self.db_ref.map_or_else(
+            || {
+                doc! {
+                    "$unset": {
+                        "fields": {
+                            field: ""
+                        }
+                    }
+                }
+            },
+            |db_ref| {
+                doc! {
+                    "$set": {
+                        "fields": {
+                            field: bson::to_bson(&db_ref).unwrap()
+                        }
+                    }
+                }
+            },
+        );
         collection
             .find_one_and_update(
                 doc! {
                     "name": self.name
                 },
-                doc! {
-                    "$set": update_doc
-                },
+                update_doc,
                 None,
             )
             .await

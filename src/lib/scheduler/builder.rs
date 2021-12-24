@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use actix::Addr;
+use hmap_serde::Labelled;
 use mongodb::{Collection, Database};
 
 use crate::db::Document;
@@ -43,7 +44,7 @@ where
 {
     pub fn db(self, db: &Database) -> ScheduleActorBuilder<T, BF, CTOR, CONF, DRV> {
         ScheduleActorBuilder {
-            collection: Some(db.collection(T::NAMESPACE)),
+            collection: Some(db.collection(T::Entry::KEY)),
             ctor_builder: self.ctor_builder,
             config: self.config,
             driver: self.driver,

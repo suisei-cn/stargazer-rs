@@ -2,6 +2,8 @@ use std::mem::MaybeUninit;
 
 use actix::{Actor, Context};
 use actix_signal::SignalHandler;
+use hmap_serde::Labelled;
+use serde::{Deserialize, Serialize};
 use tracing::{info_span, Span};
 
 use crate::db::{Collection, Document};
@@ -23,9 +25,15 @@ impl Actor for DummyTask {
     type Context = Context<Self>;
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct DummyEntry;
+
+impl Labelled for DummyEntry {
+    const KEY: &'static str = "dummy";
+}
+
 impl Task for DummyTask {
-    const NAMESPACE: &'static str = "dummy";
-    type Entry = ();
+    type Entry = DummyEntry;
     type Ctor = ();
 
     fn query() -> Document {
@@ -49,8 +57,8 @@ impl Task for DummyTask {
 
 #[test]
 fn must_task_impl_getter() {
-    fn _accept_getter<T: TaskFieldGetter>(_t: MaybeUninit<T>) {}
+    fn _accept_getter<T: TaskFieldGetter>(_t: &MaybeUninit<T>) {}
 
     let dummy: MaybeUninit<DummyTask> = MaybeUninit::uninit();
-    _accept_getter(dummy);
+    _accept_getter(&dummy);
 }
