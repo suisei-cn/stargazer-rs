@@ -152,7 +152,7 @@ async fn main() {
         if collector_config.debug.enabled {
             collector_factories.push(DebugCollectorFactory.into());
         }
-        let collector_actor = CollectorActor::new(collector_factories);
+        let collector_actor = CollectorActor::new(database.clone(), collector_factories);
         let collector_addr = collector_actor.start();
 
         let arc_coll_bililive = arc_coll_bililive.clone();

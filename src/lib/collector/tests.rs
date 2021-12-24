@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
 use futures::StreamExt;
@@ -16,10 +17,9 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_amqp::LapinTokioExt;
 use tracing_test::traced_test;
 
+use super::{CollectorFactory, PublishExpanded};
 use crate::collector::amqp::AMQPFactory;
 use crate::collector::debug::DebugCollectorFactory;
-use crate::collector::{CollectorFactory, Publish};
-use crate::db::DBRef;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 struct TestMsg {
@@ -45,21 +45,17 @@ async fn must_debug_collector() {
     };
     assert!(
         collector
-            .send(Publish::new(
-                DBRef {
-                    collection: String::new(),
-                    id: Default::default(),
-                    db: None,
-                },
-                "blabla",
-                msg.clone(),
-            ))
+            .send(PublishExpanded {
+                vtuber: String::from("v"),
+                topic: String::from("blabla"),
+                data: Arc::new(msg.clone())
+            })
             .await
             .expect("mailbox error"),
         "unable to publish event"
     );
 
-    assert!(logs_contain("[blabla]"), "no topic found");
+    assert!(logs_contain("[v.blabla]"), "no topic found");
     assert!(logs_contain(serde_json::to_string(&msg).unwrap().as_str()));
 }
 
@@ -173,15 +169,11 @@ async fn must_amqp_publish(uri: &'static str) {
     };
     assert!(
         collector
-            .send(Publish::new(
-                DBRef {
-                    collection: String::new(),
-                    id: Default::default(),
-                    db: None,
-                },
-                "blabla",
-                msg.clone(),
-            ))
+            .send(PublishExpanded {
+                vtuber: String::new(),
+                topic: String::from("blabla"),
+                data: Arc::new(msg.clone())
+            })
             .await
             .expect("mailbox error"),
         "unable to publish event"

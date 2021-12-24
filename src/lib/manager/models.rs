@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use hmap_serde::HLabelledMap;
+use mongodb::bson::oid::ObjectId;
 use mongodb::Database;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -11,6 +12,8 @@ use super::utils::deserialize_maybe_hashmap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Vtuber {
+    #[serde(rename = "_id")]
+    pub doc_id: ObjectId,
     pub name: String,
     #[serde(default, deserialize_with = "deserialize_maybe_hashmap")]
     pub fields: HashMap<String, DBRef>,

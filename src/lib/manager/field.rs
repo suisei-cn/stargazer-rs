@@ -4,9 +4,9 @@ use frunk_core::traits::Func;
 use hmap_serde::Labelled;
 use mongodb::{Collection, Database};
 
-use crate::db::{CollOperation, DBOperation};
+use crate::db::{CollOperation, DBOperation, DBRef};
 use crate::manager::ops::{CreateFieldOp, LinkRefOp};
-use crate::scheduler::Task;
+use crate::scheduler::{Entry, Task};
 use crate::utils::{BoolExt, FromStrE};
 
 use super::errors::CrudError;
@@ -46,7 +46,8 @@ async fn put<T: Task>(
     let name = name.into_inner();
     let coll = &*coll.into_inner();
     let db = &*db.into_inner();
-    let payload = T::Entry::from_str_e(payload.as_str()).map_err(|e| CrudError::InvalidValue {
+
+    let data = T::Entry::from_str_e(payload.as_str()).map_err(|e| CrudError::InvalidValue {
         value: payload,
         source: Box::new(e),
     })?;
@@ -55,6 +56,14 @@ async fn put<T: Task>(
         .execute(coll)
         .await?
         .ok_or(CrudError::MissingVtuber)?;
+
+    let root = DBRef {
+        collection: coll.name().to_string(),
+        id: vtuber.doc_id,
+        db: None,
+    };
+    let payload = Entry { root, data };
+
     let db_ref = vtuber.fields.get(T::Entry::KEY);
     if let Some(db_ref) = db_ref {
         db_ref

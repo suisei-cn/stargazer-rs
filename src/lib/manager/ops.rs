@@ -5,6 +5,7 @@ use derive_new::new;
 use erased_serde::private::serde::Serialize;
 use mongodb::bson;
 use mongodb::bson::doc;
+use mongodb::bson::oid::ObjectId;
 
 use crate::db::{CollOperation, Collection, DBRef, DBResult, Document};
 
@@ -43,6 +44,7 @@ impl CollOperation for CreateVtuberOp {
         collection
             .insert_one(
                 Vtuber {
+                    doc_id: ObjectId::new(),
                     name: self.name,
                     fields: HashMap::new(),
                 },
