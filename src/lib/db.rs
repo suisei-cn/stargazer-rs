@@ -33,8 +33,8 @@ impl DBRef {
     pub const fn set<T>(&self, data: T) -> DBRefSetOp<T> {
         DBRefSetOp(self, data)
     }
-    pub const fn del<T>(&self) -> DBRefDelOp<T> {
-        DBRefDelOp(self, PhantomData)
+    pub const fn del(&self) -> DBRefDelOp {
+        DBRefDelOp(self)
     }
 }
 
@@ -89,13 +89,10 @@ where
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct DBRefDelOp<'a, T>(&'a DBRef, PhantomData<T>);
+pub struct DBRefDelOp<'a>(&'a DBRef);
 
 #[async_trait]
-impl<T> DBOperation for DBRefDelOp<'_, T>
-where
-    T: DeserializeOwned + Send + Sync + Unpin,
-{
+impl DBOperation for DBRefDelOp<'_> {
     type Result = bool;
 
     const DESC: &'static str = "DBRefDel";
