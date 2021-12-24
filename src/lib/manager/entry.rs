@@ -30,7 +30,7 @@ where
         .execute(&*coll.into_inner())
         .await?
         .ok_or(CrudError::MissingVtuber)?;
-    let flatten = vtuber.unfold::<L::OptionHList>(&*db.into_inner()).await?;
+    let flatten = vtuber.flatten::<L::OptionHList>(&*db.into_inner()).await?;
     let wrapped = flatten.fields.0.map(Poly(OptionLiftF(IntoDisplay)));
     Ok(Json(HLabelledMap(wrapped)))
 }

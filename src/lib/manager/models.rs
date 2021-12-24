@@ -22,7 +22,7 @@ impl Vtuber {
     /// # Errors
     /// Forward underlying database errors.
     /// Also raise errors if can't fit fields into given heterogeneous list.
-    pub async fn unfold<L>(&self, db: &Database) -> DBResult<VtuberFlatten<L>>
+    pub async fn flatten<L>(&self, db: &Database) -> DBResult<VtuberFlatten<L>>
     where
         HLabelledMap<L>: DeserializeOwned,
     {
