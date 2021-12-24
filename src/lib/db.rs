@@ -155,7 +155,7 @@ pub trait DBOperation: Sized {
         let _log_guard = CustomGuard::new(|| trace!("{} db op completed", Self::DESC));
 
         trace!("{} db op started", Self::DESC);
-        self.execute(db).await
+        self.execute_impl(db).await
     }
 }
 
