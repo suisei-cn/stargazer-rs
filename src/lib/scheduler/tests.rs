@@ -1,4 +1,7 @@
+use std::convert::Infallible;
+use std::fmt::{Display, Formatter};
 use std::mem::MaybeUninit;
+use std::str::FromStr;
 
 use actix::{Actor, Context};
 use actix_signal::SignalHandler;
@@ -30,6 +33,20 @@ struct DummyEntry;
 
 impl Labelled for DummyEntry {
     const KEY: &'static str = "dummy";
+}
+
+impl FromStr for DummyEntry {
+    type Err = Infallible;
+
+    fn from_str(_: &str) -> Result<Self, Self::Err> {
+        Ok(Self)
+    }
+}
+
+impl Display for DummyEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "")
+    }
 }
 
 impl Task for DummyTask {

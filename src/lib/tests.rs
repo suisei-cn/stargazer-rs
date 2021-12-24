@@ -107,9 +107,11 @@ impl Handler<GetId> for Adder {
 }
 
 mod utils {
-    use std::fmt::{Debug, Formatter};
+    use std::convert::Infallible;
+    use std::fmt::{Debug, Display, Formatter};
     use std::marker::PhantomData;
     use std::rc::Rc;
+    use std::str::FromStr;
 
     use actix::{Actor, Context};
     use actix_signal::SignalHandler;
@@ -147,6 +149,20 @@ mod utils {
 
     impl Labelled for AEntry {
         const KEY: &'static str = "test_task";
+    }
+
+    impl FromStr for AEntry {
+        type Err = Infallible;
+
+        fn from_str(_: &str) -> Result<Self, Self::Err> {
+            Ok(Self)
+        }
+    }
+
+    impl Display for AEntry {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(f, "")
+        }
     }
 
     impl<T: StaticUnpinned, U: Copy + Eq + StaticUnpinned> Task for A<T, U> {

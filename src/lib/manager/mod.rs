@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use actix_web::web::Data;
 use actix_web::{web, Scope};
-use frunk_core::hlist::{HCons, HFoldLeftable, HNil};
+use frunk_core::hlist::{HCons, HFoldLeftable, HMappable, HNil};
 use frunk_core::traits::Poly;
 use hmap_serde::{HLabelledMap, Labelled};
 use mongodb::{Collection, Database};
@@ -14,6 +14,7 @@ use field::FoldFieldEp;
 pub use models::Vtuber;
 use utils::ToOptionHList;
 
+use crate::manager::utils::{IntoDisplay, OptionLiftF};
 use crate::scheduler::Task;
 
 mod entry;
@@ -77,7 +78,8 @@ impl<L> Manager<L>
 where
     L: HFoldLeftable<Poly<FoldFieldEp>, Scope, Output = Scope> + ToOptionHList + Copy + 'static,
     HLabelledMap<L::OptionHList>: Serialize + DeserializeOwned,
-    L::OptionHList: 'static,
+    L::OptionHList: 'static + HMappable<Poly<OptionLiftF<IntoDisplay>>>,
+    HLabelledMap<<L::OptionHList as HMappable<Poly<OptionLiftF<IntoDisplay>>>>::Output>: Serialize,
 {
     #[allow(clippy::similar_names)]
     pub fn build(self, prefix: &str) -> Scope {
@@ -85,7 +87,7 @@ where
             .pipe(|scope| self.sources.foldl(Poly(FoldFieldEp), scope))
             .service(
                 web::resource("")
-                    .route(web::get().to(entry::get::<L>))
+                    .route(web::get().to(entry::get::<L, _, _>))
                     .route(web::delete().to(entry::delete)),
             );
         Scope::new(prefix)

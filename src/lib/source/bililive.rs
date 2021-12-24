@@ -1,5 +1,7 @@
 use std::error::Error;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
+use std::num::ParseIntError;
+use std::str::FromStr;
 
 use actix::fut::ready;
 use actix::{
@@ -26,6 +28,26 @@ type BoxedError = Box<dyn Error>;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct BililiveEntry {
     pub uid: u64,
+}
+
+impl Labelled for BililiveEntry {
+    const KEY: &'static str = "bililive";
+}
+
+impl FromStr for BililiveEntry {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            uid: u64::from_str(s)?,
+        })
+    }
+}
+
+impl Display for BililiveEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.uid)
+    }
 }
 
 #[derive(Debug, Clone, SignalHandler)]
@@ -102,10 +124,6 @@ impl Actor for BililiveActor {
                 .actor_instrument(self.span()),
         );
     }
-}
-
-impl Labelled for BililiveEntry {
-    const KEY: &'static str = "bililive";
 }
 
 impl Task for BililiveActor {

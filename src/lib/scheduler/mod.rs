@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use actix::{Actor, Context};
 use actix_signal::SignalHandler;
@@ -10,7 +10,7 @@ pub use actor::ScheduleActor;
 pub use models::TaskInfo;
 
 use crate::db::{Collection, DBRef, Document};
-use crate::utils::Scheduler;
+use crate::utils::{FromStrE, Scheduler};
 
 pub mod actor;
 mod builder;
@@ -43,7 +43,15 @@ pub trait TaskFieldGetter: SchedulerGetter + InfoGetter {}
 impl<T> TaskFieldGetter for T where T: SchedulerGetter + InfoGetter {}
 
 pub trait Task: TaskFieldGetter + Actor<Context = Context<Self>> + SignalHandler + Debug {
-    type Entry: Debug + Serialize + DeserializeOwned + Send + Sync + Unpin + Labelled;
+    type Entry: Debug
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + Unpin
+        + Labelled
+        + FromStrE
+        + Display;
     type Ctor;
     fn query() -> Document;
     fn construct(

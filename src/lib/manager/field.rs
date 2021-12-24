@@ -1,4 +1,4 @@
-use actix_web::web::{Data, Json, Path};
+use actix_web::web::{Data, Path};
 use actix_web::{web, HttpResponse, Scope};
 use frunk_core::traits::Func;
 use hmap_serde::Labelled;
@@ -7,7 +7,7 @@ use mongodb::{Collection, Database};
 use crate::db::{CollOperation, DBOperation};
 use crate::manager::ops::{CreateFieldOp, LinkRefOp};
 use crate::scheduler::Task;
-use crate::utils::BoolExt;
+use crate::utils::{BoolExt, FromStrE};
 
 use super::errors::CrudError;
 use super::models::Vtuber;
@@ -20,7 +20,7 @@ async fn get<T: Task>(
     name: Path<String>,
     coll: Data<Collection<Vtuber>>,
     db: Data<Database>,
-) -> Result<Json<T::Entry>, CrudError> {
+) -> Result<String, CrudError> {
     let vtuber = GetVtuberOp::new(name.into_inner())
         .execute(&*coll.into_inner())
         .await?
@@ -29,25 +29,27 @@ async fn get<T: Task>(
         .fields
         .get(T::Entry::KEY)
         .ok_or(CrudError::MissingField)?;
-    Ok(Json(
-        db_ref
-            .get()
-            .execute(&*db.into_inner())
-            .await?
-            .ok_or(CrudError::Inconsistency)?,
-    ))
+    Ok(db_ref
+        .get::<T::Entry>()
+        .execute(&*db.into_inner())
+        .await?
+        .ok_or(CrudError::Inconsistency)?
+        .to_string())
 }
 
 async fn put<T: Task>(
     name: Path<String>,
     coll: Data<Collection<Vtuber>>,
     db: Data<Database>,
-    payload: Json<T::Entry>,
+    payload: String,
 ) -> Result<HttpResponse, CrudError> {
     let name = name.into_inner();
     let coll = &*coll.into_inner();
     let db = &*db.into_inner();
-    let payload = payload.into_inner();
+    let payload = T::Entry::from_str_e(payload.as_str()).map_err(|e| CrudError::InvalidValue {
+        value: payload,
+        source: Box::new(e),
+    })?;
 
     let vtuber = GetVtuberOp::new(name.clone())
         .execute(coll)

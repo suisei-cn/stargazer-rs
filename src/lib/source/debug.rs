@@ -1,3 +1,7 @@
+use std::fmt::{Display, Formatter};
+use std::num::ParseIntError;
+use std::str::FromStr;
+
 use actix::{Actor, Context};
 use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
@@ -14,6 +18,26 @@ use crate::ScheduleConfig;
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct DebugEntry {
     id: u64,
+}
+
+impl Labelled for DebugEntry {
+    const KEY: &'static str = "debug";
+}
+
+impl FromStr for DebugEntry {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            id: u64::from_str(s)?,
+        })
+    }
+}
+
+impl Display for DebugEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)
+    }
 }
 
 #[derive(Debug, Clone, SignalHandler)]
@@ -41,10 +65,6 @@ impl Actor for DebugActor {
             info!("stopped");
         });
     }
-}
-
-impl Labelled for DebugEntry {
-    const KEY: &'static str = "debug";
 }
 
 impl Task for DebugActor {

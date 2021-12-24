@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
@@ -10,6 +11,48 @@ use serde::{Deserialize, Deserializer, Serialize};
 use crate::db::DBRef;
 use crate::manager::Source;
 use crate::scheduler::Task;
+use crate::utils::FromStrE;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FieldDisplay<T>(String, PhantomData<T>);
+
+impl<T: Labelled> Labelled for FieldDisplay<T> {
+    const KEY: &'static str = T::KEY;
+}
+
+pub struct FromDisplay;
+
+pub struct IntoDisplay;
+
+impl<T: FromStrE> Func<FieldDisplay<T>> for FromDisplay {
+    type Output = Result<T, T::Err>;
+
+    fn call(i: FieldDisplay<T>) -> Self::Output {
+        T::from_str_e(i.0.as_str())
+    }
+}
+
+impl<T: Display> Func<T> for IntoDisplay {
+    type Output = FieldDisplay<T>;
+
+    fn call(i: T) -> Self::Output {
+        FieldDisplay(i.to_string(), PhantomData)
+    }
+}
+
+pub struct OptionLiftF<F>(pub F);
+
+impl<F, I> Func<Option<I>> for OptionLiftF<F>
+where
+    F: Func<I>,
+{
+    type Output = Option<F::Output>;
+
+    fn call(i: Option<I>) -> Self::Output {
+        i.map(|i| F::call(i))
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]

@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use actix_web::http::StatusCode;
 use actix_web::ResponseError;
 use thiserror::Error;
@@ -10,6 +12,11 @@ pub enum CrudError {
     MissingVtuber,
     #[error("missing field")]
     MissingField,
+    #[error("invalid value: {value} - {source}")]
+    InvalidValue {
+        value: String,
+        source: Box<dyn Error>,
+    },
     #[error("FATAL: internal inconsistency")]
     Inconsistency,
 }
@@ -19,6 +26,7 @@ impl ResponseError for CrudError {
         match self {
             CrudError::MissingVtuber | CrudError::MissingField => StatusCode::NOT_FOUND,
             CrudError::DBError(_) | CrudError::Inconsistency => StatusCode::INTERNAL_SERVER_ERROR,
+            CrudError::InvalidValue { .. } => StatusCode::BAD_REQUEST,
         }
     }
 }

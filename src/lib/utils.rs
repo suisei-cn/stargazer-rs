@@ -1,4 +1,6 @@
+use std::error::Error;
 use std::ops::Deref;
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actix::Addr;
@@ -158,5 +160,23 @@ pub trait BoolExt {
 impl BoolExt for bool {
     fn true_or<E>(self, e: E) -> Result<(), E> {
         self.then(|| ()).ok_or(e)
+    }
+}
+
+pub trait FromStrE: Sized {
+    type Err: Error;
+    #[allow(clippy::missing_errors_doc)]
+    fn from_str_e(s: &str) -> Result<Self, Self::Err>;
+}
+
+impl<T, E> FromStrE for T
+where
+    T: FromStr<Err = E>,
+    E: Error,
+{
+    type Err = E;
+
+    fn from_str_e(s: &str) -> Result<Self, Self::Err> {
+        FromStr::from_str(s)
     }
 }

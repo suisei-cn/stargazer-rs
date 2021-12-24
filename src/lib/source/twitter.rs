@@ -1,3 +1,7 @@
+use std::fmt::{Display, Formatter};
+use std::num::ParseIntError;
+use std::str::FromStr;
+
 use actix::fut::ready;
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Context, ResponseActFuture, WrapFuture,
@@ -5,7 +9,6 @@ use actix::{
 use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
 use egg_mode::entities::MediaType;
-use egg_mode::error::Result;
 use egg_mode::user::UserID;
 use egg_mode::{tweet, Token};
 use hmap_serde::Labelled;
@@ -26,6 +29,27 @@ use crate::ScheduleConfig;
 pub struct TwitterEntry {
     uid: u64,
     since: Option<u64>,
+}
+
+impl Labelled for TwitterEntry {
+    const KEY: &'static str = "debug";
+}
+
+impl FromStr for TwitterEntry {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            uid: u64::from_str(s)?,
+            since: None,
+        })
+    }
+}
+
+impl Display for TwitterEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.uid)
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
@@ -104,7 +128,10 @@ impl Actor for TwitterActor {
     }
 }
 
-async fn fetch_tweets(token: Token, entry: TwitterEntry) -> Result<(Option<u64>, Vec<Tweet>)> {
+async fn fetch_tweets(
+    token: Token,
+    entry: TwitterEntry,
+) -> egg_mode::error::Result<(Option<u64>, Vec<Tweet>)> {
     let tl = tweet::user_timeline(UserID::ID(entry.uid), false, true, &token);
     let (_, tweets) = tl.with_page_size(5).older(entry.since).await?;
 
@@ -134,10 +161,6 @@ async fn fetch_tweets(token: Token, entry: TwitterEntry) -> Result<(Option<u64>,
             })
             .collect(),
     ))
-}
-
-impl Labelled for TwitterEntry {
-    const KEY: &'static str = "twitter";
 }
 
 impl Task for TwitterActor {
