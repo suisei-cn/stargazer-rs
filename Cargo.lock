@@ -1004,6 +1004,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "frunk_core"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1246cf43ec80bf8b2505b5c360b8fb999c97dabd17dbb604d85558d5cbc25482"
+
+[[package]]
 name = "futures"
 version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1201,6 +1207,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddca131f3e7f2ce2df364b57949a9d47915cfbd35e46cfee355ccebbf794d6a2"
 dependencies = [
  "digest 0.10.1",
+]
+
+[[package]]
+name = "hmap-serde"
+version = "0.1.0-alpha.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b744a929671d06288f3ecd044cf464f1a378f78e482ed7e7b12f56119bbdfad"
+dependencies = [
+ "frunk_core",
+ "serde",
 ]
 
 [[package]]
@@ -2371,8 +2387,10 @@ dependencies = [
  "egg-mode",
  "erased-serde",
  "figment",
+ "frunk_core",
  "futures",
  "getset",
+ "hmap-serde",
  "humantime-serde",
  "itertools",
  "lapin",
@@ -2384,6 +2402,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
+ "tap",
  "testcontainers",
  "thiserror",
  "tokio",
@@ -2494,6 +2513,12 @@ name = "take_mut"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f764005d11ee5f36500a149ace24e00e3da98b0158b3e2d53a7495660d3f4d60"
+
+[[package]]
+name = "tap"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tcp-stream"

@@ -1,11 +1,16 @@
+use std::convert::Infallible;
+use std::fmt::{Display, Formatter};
 use std::mem::MaybeUninit;
+use std::str::FromStr;
 
 use actix::{Actor, Context};
 use actix_signal::SignalHandler;
+use hmap_serde::Labelled;
+use serde::{Deserialize, Serialize};
 use tracing::{info_span, Span};
 
 use crate::db::{Collection, Document};
-use crate::scheduler::{Task, TaskFieldGetter};
+use crate::scheduler::{Entry, Task, TaskFieldGetter};
 use crate::utils::Scheduler;
 
 use super::models::TaskInfo;
@@ -23,8 +28,29 @@ impl Actor for DummyTask {
     type Context = Context<Self>;
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct DummyEntry;
+
+impl Labelled for DummyEntry {
+    const KEY: &'static str = "dummy";
+}
+
+impl FromStr for DummyEntry {
+    type Err = Infallible;
+
+    fn from_str(_: &str) -> Result<Self, Self::Err> {
+        Ok(Self)
+    }
+}
+
+impl Display for DummyEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "")
+    }
+}
+
 impl Task for DummyTask {
-    type Entry = ();
+    type Entry = DummyEntry;
     type Ctor = ();
 
     fn query() -> Document {
@@ -32,7 +58,7 @@ impl Task for DummyTask {
     }
 
     fn construct(
-        _entry: Self::Entry,
+        _entry: Entry<Self::Entry>,
         _ctor: Self::Ctor,
         _scheduler: Scheduler<Self>,
         _info: TaskInfo,
@@ -48,8 +74,8 @@ impl Task for DummyTask {
 
 #[test]
 fn must_task_impl_getter() {
-    fn _accept_getter<T: TaskFieldGetter>(_t: MaybeUninit<T>) {}
+    fn _accept_getter<T: TaskFieldGetter>(_t: &MaybeUninit<T>) {}
 
     let dummy: MaybeUninit<DummyTask> = MaybeUninit::uninit();
-    _accept_getter(dummy);
+    _accept_getter(&dummy);
 }

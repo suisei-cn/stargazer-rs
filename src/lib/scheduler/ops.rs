@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::db::{Collection, DBOperation};
+use crate::db::{CollOperation, Collection};
 use crate::utils::timestamp;
 
 use super::models::{SchedulerMeta, TaskInfo};
@@ -25,13 +25,11 @@ pub struct CheckOwnershipOp {
 }
 
 #[async_trait]
-impl DBOperation for CheckOwnershipOp {
+impl CollOperation for CheckOwnershipOp {
     type Result = bool;
     type Item = TaskInfo;
 
-    fn desc() -> &'static str {
-        "CheckOwnership"
-    }
+    const DESC: &'static str = "CheckOwnership";
 
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         collection
@@ -48,13 +46,11 @@ pub struct UpdateEntryOp<T> {
 }
 
 #[async_trait]
-impl<T: Serialize + Send> DBOperation for UpdateEntryOp<T> {
+impl<T: Serialize + Send> CollOperation for UpdateEntryOp<T> {
     type Result = bool;
     type Item = Document;
 
-    fn desc() -> &'static str {
-        "UpdateEntry"
-    }
+    const DESC: &'static str = "UpdateEntry";
 
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let mut body = if let Some(body) = &self.body {
@@ -116,13 +112,11 @@ pub struct GetAllTasksCount {
 }
 
 #[async_trait]
-impl DBOperation for GetAllTasksCount {
+impl CollOperation for GetAllTasksCount {
     type Result = u64;
     type Item = Document;
 
-    fn desc() -> &'static str {
-        "GetAllTasksCount"
-    }
+    const DESC: &'static str = "GetAllTasksCount";
 
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         collection
@@ -139,13 +133,11 @@ pub struct GetWorkerInfoOp {
 }
 
 #[async_trait]
-impl DBOperation for GetWorkerInfoOp {
+impl CollOperation for GetWorkerInfoOp {
     type Result = Vec<WorkerInfo>;
     type Item = WorkerInfo;
 
-    fn desc() -> &'static str {
-        "GetWorkerInfo"
-    }
+    const DESC: &'static str = "GetWorkerInfo";
 
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let filter_query = doc! {
@@ -179,13 +171,11 @@ pub struct GetTasksOnWorkerOp {
 }
 
 #[async_trait]
-impl DBOperation for GetTasksOnWorkerOp {
+impl CollOperation for GetTasksOnWorkerOp {
     type Result = Vec<TaskInfo>;
     type Item = TaskInfo;
 
-    fn desc() -> &'static str {
-        "GetTasksOnWorker"
-    }
+    const DESC: &'static str = "GetTasksOnWorker";
 
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         let filter_query = doc! {
@@ -336,13 +326,11 @@ impl<T> ScheduleOp<T> {
 }
 
 #[async_trait]
-impl<T: DeserializeOwned + Send + Sync> DBOperation for ScheduleOp<T> {
+impl<T: DeserializeOwned + Send + Sync> CollOperation for ScheduleOp<T> {
     type Result = Option<(TaskInfo, T)>;
     type Item = Document;
 
-    fn desc() -> &'static str {
-        "Schedule"
-    }
+    const DESC: &'static str = "Schedule";
 
     async fn execute_impl(self, collection: &Collection<Self::Item>) -> DBResult<Self::Result> {
         Ok(match self.mode {

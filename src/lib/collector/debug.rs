@@ -2,7 +2,7 @@ use actix::{Actor, Context, Handler, Recipient};
 use async_trait::async_trait;
 use tracing::{info, info_span};
 
-use crate::collector::{Collector, CollectorFactory, Publish};
+use super::{Collector, CollectorFactory, PublishExpanded};
 
 #[derive(Debug)]
 pub struct DebugCollectorFactory;
@@ -13,7 +13,7 @@ impl CollectorFactory for DebugCollectorFactory {
         String::from("debug")
     }
 
-    async fn build(&self) -> Option<Recipient<Publish>> {
+    async fn build(&self) -> Option<Recipient<PublishExpanded>> {
         let addr = DebugCollector.start();
         Some(addr.recipient())
     }
@@ -26,12 +26,13 @@ impl Actor for DebugCollector {
     type Context = Context<Self>;
 }
 
-impl Handler<Publish> for DebugCollector {
+impl Handler<PublishExpanded> for DebugCollector {
     type Result = bool;
 
-    fn handle(&mut self, msg: Publish, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: PublishExpanded, _ctx: &mut Self::Context) -> Self::Result {
         let output = serde_json::to_string(&*msg.data).unwrap();
-        info_span!("debug").in_scope(|| info!("collected: [{}] {}", msg.topic, output));
+        info_span!("debug")
+            .in_scope(|| info!("collected: [{}.{}] {}", msg.vtuber, msg.topic, output));
         true
     }
 }

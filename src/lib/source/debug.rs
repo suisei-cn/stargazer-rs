@@ -1,12 +1,17 @@
+use std::fmt::{Display, Formatter};
+use std::num::ParseIntError;
+use std::str::FromStr;
+
 use actix::{Actor, Context};
 use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
+use hmap_serde::Labelled;
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, info_span, Span};
 
 use crate::db::{Coll, Collection, Document};
-use crate::scheduler::{Task, TaskInfo};
+use crate::scheduler::{Entry, Task, TaskInfo};
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
 
@@ -15,16 +20,36 @@ pub struct DebugEntry {
     id: u64,
 }
 
+impl Labelled for DebugEntry {
+    const KEY: &'static str = "debug";
+}
+
+impl FromStr for DebugEntry {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            id: u64::from_str(s)?,
+        })
+    }
+}
+
+impl Display for DebugEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
+
 #[derive(Debug, Clone, SignalHandler)]
 pub struct DebugActor {
-    entry: DebugEntry,
+    entry: Entry<DebugEntry>,
     schedule_config: ScheduleConfig,
     info: TaskInfo,
     scheduler: Scheduler<Self>,
 }
 impl_task_field_getter!(DebugActor, info, scheduler);
 impl_stop_on_panic!(DebugActor);
-impl_to_collector_handler!(DebugActor);
+impl_to_collector_handler!(DebugActor, entry);
 
 impl Actor for DebugActor {
     type Context = Context<Self>;
@@ -51,7 +76,7 @@ impl Task for DebugActor {
     }
 
     fn construct(
-        entry: Self::Entry,
+        entry: Entry<Self::Entry>,
         ctor: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
@@ -67,7 +92,7 @@ impl Task for DebugActor {
 
     fn span(&self) -> Span {
         let task_id = self.info.uuid;
-        let entry_id = self.entry.id;
+        let entry_id = self.entry.data.id;
         info_span!("debug", ?task_id, entry_id)
     }
 }

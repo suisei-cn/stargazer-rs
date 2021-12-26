@@ -1,5 +1,7 @@
 use std::error::Error;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
+use std::num::ParseIntError;
+use std::str::FromStr;
 
 use actix::fut::ready;
 use actix::{
@@ -9,13 +11,14 @@ use actix_bililive::errors::StreamError;
 use actix_bililive::{connect_with_retry, ConfigBuilder, Packet, RetryConfig};
 use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
+use hmap_serde::Labelled;
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, info_span, Span};
 use tracing_actix::ActorInstrument;
 
 use crate::db::{Coll, Collection, Document};
-use crate::scheduler::{Task, TaskInfo};
+use crate::scheduler::{Entry, Task, TaskInfo};
 use crate::source::ToCollector;
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
@@ -27,9 +30,29 @@ pub struct BililiveEntry {
     pub uid: u64,
 }
 
+impl Labelled for BililiveEntry {
+    const KEY: &'static str = "bililive";
+}
+
+impl FromStr for BililiveEntry {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            uid: u64::from_str(s)?,
+        })
+    }
+}
+
+impl Display for BililiveEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.uid)
+    }
+}
+
 #[derive(Debug, Clone, SignalHandler)]
 pub struct BililiveActor {
-    uid: u64,
+    entry: Entry<BililiveEntry>,
     schedule_config: ScheduleConfig,
     collection: Collection<Document>,
     info: TaskInfo,
@@ -38,7 +61,7 @@ pub struct BililiveActor {
 
 impl_task_field_getter!(BililiveActor, info, scheduler);
 impl_stop_on_panic!(BililiveActor);
-impl_to_collector_handler!(BililiveActor);
+impl_to_collector_handler!(BililiveActor, entry);
 
 impl StreamHandler<Result<Packet, StreamError>> for BililiveActor {
     fn handle(&mut self, item: Result<Packet, StreamError>, ctx: &mut Self::Context) {
@@ -66,7 +89,7 @@ impl Actor for BililiveActor {
             info!("started");
         });
 
-        let uid = self.uid;
+        let uid = self.entry.data.uid;
         ctx.spawn(
             ready(())
                 .into_actor(self)
@@ -112,14 +135,14 @@ impl Task for BililiveActor {
     }
 
     fn construct(
-        entry: Self::Entry,
+        entry: Entry<Self::Entry>,
         ctor: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
         collection: Collection<Document>,
     ) -> Self {
         Self {
-            uid: entry.uid,
+            entry,
             schedule_config: ctor,
             collection,
             info,
@@ -129,7 +152,7 @@ impl Task for BililiveActor {
 
     fn span(&self) -> Span {
         let task_id = self.info.uuid;
-        let uid = self.uid;
+        let uid = self.entry.data.uid;
         info_span!("bililive", ?task_id, uid)
     }
 }

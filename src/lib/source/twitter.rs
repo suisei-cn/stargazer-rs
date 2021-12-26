@@ -1,3 +1,7 @@
+use std::fmt::{Display, Formatter};
+use std::num::ParseIntError;
+use std::str::FromStr;
+
 use actix::fut::ready;
 use actix::{
     Actor, ActorContext, ActorFutureExt, AsyncContext, Context, ResponseActFuture, WrapFuture,
@@ -5,9 +9,9 @@ use actix::{
 use actix_signal::SignalHandler;
 use actix_web::{get, web, Responder};
 use egg_mode::entities::MediaType;
-use egg_mode::error::Result;
 use egg_mode::user::UserID;
 use egg_mode::{tweet, Token};
+use hmap_serde::Labelled;
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::Span;
@@ -16,7 +20,7 @@ use tracing_actix::ActorInstrument;
 
 use crate::db::{Coll, Collection, Document};
 use crate::scheduler::messages::UpdateEntry;
-use crate::scheduler::{Task, TaskInfo};
+use crate::scheduler::{Entry, Task, TaskInfo};
 use crate::source::ToCollector;
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
@@ -25,6 +29,27 @@ use crate::ScheduleConfig;
 pub struct TwitterEntry {
     uid: u64,
     since: Option<u64>,
+}
+
+impl Labelled for TwitterEntry {
+    const KEY: &'static str = "debug";
+}
+
+impl FromStr for TwitterEntry {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            uid: u64::from_str(s)?,
+            since: None,
+        })
+    }
+}
+
+impl Display for TwitterEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.uid)
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
@@ -43,7 +68,7 @@ pub struct Tweet {
 #[derive(Debug, Clone, SignalHandler)]
 pub struct TwitterActor {
     token: Token,
-    entry: TwitterEntry,
+    entry: Entry<TwitterEntry>,
     schedule_config: ScheduleConfig,
     collection: Collection<Document>,
     info: TaskInfo,
@@ -52,7 +77,7 @@ pub struct TwitterActor {
 
 impl_task_field_getter!(TwitterActor, info, scheduler);
 impl_stop_on_panic!(TwitterActor);
-impl_to_collector_handler!(TwitterActor);
+impl_to_collector_handler!(TwitterActor, entry);
 
 impl Actor for TwitterActor {
     type Context = Context<Self>;
@@ -64,7 +89,7 @@ impl Actor for TwitterActor {
 
         ctx.run_interval(self.schedule_config.max_interval / 2, |act, ctx| {
             let token = act.token.clone();
-            let entry = act.entry;
+            let entry = act.entry.data;
             ctx.spawn(
                 fetch_tweets(token, entry)
                     .into_actor(act)
@@ -74,7 +99,7 @@ impl Actor for TwitterActor {
                                 if !tweets.is_empty() {
                                     ctx.notify(ToCollector::new("twitter", tweets));
                                 }
-                                act.entry.since = since;
+                                act.entry.data.since = since;
                                 Box::pin(
                                     act.scheduler
                                         .send(UpdateEntry::new(act.info, TwitterSince { since }))
@@ -103,7 +128,10 @@ impl Actor for TwitterActor {
     }
 }
 
-async fn fetch_tweets(token: Token, entry: TwitterEntry) -> Result<(Option<u64>, Vec<Tweet>)> {
+async fn fetch_tweets(
+    token: Token,
+    entry: TwitterEntry,
+) -> egg_mode::error::Result<(Option<u64>, Vec<Tweet>)> {
     let tl = tweet::user_timeline(UserID::ID(entry.uid), false, true, &token);
     let (_, tweets) = tl.with_page_size(5).older(entry.since).await?;
 
@@ -144,7 +172,7 @@ impl Task for TwitterActor {
     }
 
     fn construct(
-        entry: Self::Entry,
+        entry: Entry<Self::Entry>,
         ctor: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
@@ -162,7 +190,7 @@ impl Task for TwitterActor {
 
     fn span(&self) -> Span {
         let task_id = self.info.uuid;
-        let uid = self.entry.uid;
+        let uid = self.entry.data.uid;
         info_span!("twitter", ?task_id, uid)
     }
 }

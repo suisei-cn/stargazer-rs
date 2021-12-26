@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
 use futures::StreamExt;
@@ -16,9 +17,9 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_amqp::LapinTokioExt;
 use tracing_test::traced_test;
 
+use super::{CollectorFactory, PublishExpanded};
 use crate::collector::amqp::AMQPFactory;
 use crate::collector::debug::DebugCollectorFactory;
-use crate::collector::{CollectorFactory, Publish};
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 struct TestMsg {
@@ -44,14 +45,18 @@ async fn must_debug_collector() {
     };
     assert!(
         collector
-            .send(Publish::new("blabla", msg.clone()))
+            .send(PublishExpanded {
+                vtuber: String::from("v"),
+                topic: String::from("blabla"),
+                data: Arc::new(msg.clone())
+            })
             .await
             .expect("mailbox error"),
         "unable to publish event"
     );
 
-    assert!(logs_contain("[blabla]"), "no topic found");
-    assert!(logs_contain(serde_json::to_string(&msg).unwrap().as_str()))
+    assert!(logs_contain("[v.blabla]"), "no topic found");
+    assert!(logs_contain(serde_json::to_string(&msg).unwrap().as_str()));
 }
 
 #[actix::test]
@@ -164,7 +169,11 @@ async fn must_amqp_publish(uri: &'static str) {
     };
     assert!(
         collector
-            .send(Publish::new("blabla", msg.clone()))
+            .send(PublishExpanded {
+                vtuber: String::new(),
+                topic: String::from("blabla"),
+                data: Arc::new(msg.clone())
+            })
             .await
             .expect("mailbox error"),
         "unable to publish event"
@@ -172,11 +181,13 @@ async fn must_amqp_publish(uri: &'static str) {
 
     tokio::time::sleep(Duration::from_millis(100)).await;
     stop_tx.send(()).unwrap();
-    let received_msgs_ref = received_msgs.borrow();
-    assert_eq!(received_msgs_ref.len(), 1);
-    let received_msg: TestMsg = serde_json::from_slice(&*received_msgs_ref.first().unwrap())
-        .expect("unable to deserialize msg");
-    assert_eq!(msg, received_msg);
+    {
+        let received_msgs_ref = received_msgs.borrow();
+        assert_eq!(received_msgs_ref.len(), 1);
+        let received_msg: TestMsg = serde_json::from_slice(&*received_msgs_ref.first().unwrap())
+            .expect("unable to deserialize msg");
+        assert_eq!(msg, received_msg);
+    }
 
     handler.await.unwrap();
 }

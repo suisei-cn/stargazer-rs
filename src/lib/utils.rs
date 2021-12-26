@@ -1,4 +1,6 @@
+use std::error::Error;
 use std::ops::Deref;
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actix::Addr;
@@ -61,7 +63,7 @@ macro_rules! impl_task_field_getter {
 
 #[macro_export]
 macro_rules! impl_to_collector_handler {
-    ($Self: ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)?) => {
+    ($Self: ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)? , $entry: ident) => {
         impl<$($( $lt $( : $clt $(+ $dlt )* )? ),+ , )? Z: 'static + serde::Serialize + Send + Sync >
             actix::Handler<crate::source::ToCollector<Z>> for $Self $(< $( $lt ),+ >)?
         {
@@ -81,6 +83,7 @@ macro_rules! impl_to_collector_handler {
                 use crate::scheduler::InfoGetter;
                 use crate::scheduler::SchedulerGetter;
 
+                let root = self.$entry.root.clone();
                 Box::pin(
                     self.get_scheduler()
                         .send(crate::scheduler::messages::CheckOwnership::new(self.get_info()))
@@ -90,7 +93,7 @@ macro_rules! impl_to_collector_handler {
                             if holding_ownership {
                                 crate::context::ArbiterContext::with(|ctx| {
                                     ctx.send::<crate::collector::CollectorActor, _>(
-                                        crate::collector::Publish::new(&*msg.topic, msg.body),
+                                        crate::collector::Publish::new(root, &*msg.topic, msg.body),
                                     )
                                     .unwrap()
                                     .immediately();
@@ -146,5 +149,34 @@ where
 {
     fn drop(&mut self) {
         (self.on_exit)();
+    }
+}
+
+pub trait BoolExt {
+    #[allow(clippy::missing_errors_doc)]
+    fn true_or<E>(self, e: E) -> Result<(), E>;
+}
+
+impl BoolExt for bool {
+    fn true_or<E>(self, e: E) -> Result<(), E> {
+        self.then(|| ()).ok_or(e)
+    }
+}
+
+pub trait FromStrE: Sized {
+    type Err: Error;
+    #[allow(clippy::missing_errors_doc)]
+    fn from_str_e(s: &str) -> Result<Self, Self::Err>;
+}
+
+impl<T, E> FromStrE for T
+where
+    T: FromStr<Err = E>,
+    E: Error,
+{
+    type Err = E;
+
+    fn from_str_e(s: &str) -> Result<Self, Self::Err> {
+        FromStr::from_str(s)
     }
 }

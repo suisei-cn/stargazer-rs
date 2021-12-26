@@ -7,13 +7,19 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use actix::fut::{ready, wrap_future};
-use actix::{Actor, ActorFutureExt, AsyncContext, AtomicResponse, Handler, Message, Recipient};
+use actix::{
+    Actor, ActorFutureExt, AsyncContext, AtomicResponse, Handler, Message, Recipient,
+    ResponseActFuture, WrapFuture,
+};
 use arraydeque::{ArrayDeque, Wrapping};
 use async_trait::async_trait;
+use mongodb::Database;
 use serde::Serialize;
 use tracing::{debug, error, info, info_span, trace, warn, Span};
 use tracing_actix::ActorInstrument;
 
+use crate::db::{DBOperation, DBRef, DBResult};
+use crate::manager::Vtuber;
 use crate::ArbiterContext;
 
 pub mod amqp;
@@ -27,9 +33,11 @@ fn span() -> Span {
     info_span!("collector", arb=?arb_id)
 }
 
+// TODO split msg sent to dispatcher & collector impl
 #[derive(Clone, Message)]
-#[rtype("bool")]
+#[rtype("()")]
 pub struct Publish {
+    root: DBRef,
     topic: String,
     data: Arc<dyn erased_serde::Serialize + Send + Sync>,
 }
@@ -37,6 +45,37 @@ pub struct Publish {
 impl Debug for Publish {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Publish")
+            .field("root", &self.root)
+            .field("topic", &self.topic)
+            .field("data", &"...")
+            .finish()
+    }
+}
+
+impl Publish {
+    async fn expand(self, db: Database) -> DBResult<Option<PublishExpanded>> {
+        let vtuber = self.root.get::<Vtuber>().execute(&db).await?;
+        Ok(vtuber.map(|vtuber| PublishExpanded {
+            vtuber: vtuber.name,
+            topic: self.topic,
+            data: self.data,
+        }))
+    }
+}
+
+#[derive(Clone, Message)]
+#[rtype("bool")]
+pub struct PublishExpanded {
+    // TODO more fields?
+    vtuber: String,
+    topic: String,
+    data: Arc<dyn erased_serde::Serialize + Send + Sync>,
+}
+
+impl Debug for PublishExpanded {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PublishExpanded")
+            .field("vtuber", &self.vtuber)
             .field("topic", &self.topic)
             .field("data", &"...")
             .finish()
@@ -48,8 +87,9 @@ impl Publish {
     ///
     /// # Panics
     /// Panics when given `data` can't be serialized into json.
-    pub fn new<T: 'static + Serialize + Send + Sync>(topic: &str, data: T) -> Self {
+    pub fn new<T: 'static + Serialize + Send + Sync>(root: DBRef, topic: &str, data: T) -> Self {
         Self {
+            root,
             topic: topic.to_string(),
             data: Arc::new(data),
         }
@@ -60,12 +100,12 @@ impl Publish {
 #[rtype("()")]
 struct Wake(CollectorFactoryWrapped);
 
-pub trait Collector: Actor<Context = actix::Context<Self>> + Handler<Publish> {}
+pub trait Collector: Actor<Context = actix::Context<Self>> + Handler<PublishExpanded> {}
 
 #[async_trait]
 pub trait CollectorFactory: Debug {
     fn ident(&self) -> String;
-    async fn build(&self) -> Option<Recipient<Publish>>;
+    async fn build(&self) -> Option<Recipient<PublishExpanded>>;
 }
 
 #[derive(Debug, Clone)]
@@ -101,7 +141,7 @@ impl Deref for CollectorFactoryWrapped {
 
 #[derive(Debug)]
 enum State {
-    Available(Recipient<Publish>),
+    Available(Recipient<PublishExpanded>),
     DelayedEstablish(Instant),
     Uninit,
 }
@@ -115,18 +155,20 @@ impl Default for State {
 #[derive(Debug, Default)]
 struct Context {
     state: State,
-    queue: ArrayDeque<[Publish; 1024], Wrapping>,
+    queue: ArrayDeque<[PublishExpanded; 1024], Wrapping>,
 }
 
 pub struct CollectorActor {
+    db: Database,
     collectors: HashMap<CollectorFactoryWrapped, Context>,
 }
 
 impl_stop_on_panic!(CollectorActor);
 
 impl CollectorActor {
-    pub fn new(factories: Vec<CollectorFactoryWrapped>) -> Self {
+    pub fn new(db: Database, factories: Vec<CollectorFactoryWrapped>) -> Self {
         Self {
+            db,
             collectors: factories
                 .into_iter()
                 .map(|factory| (factory, Context::default()))
@@ -140,22 +182,30 @@ impl Actor for CollectorActor {
 }
 
 impl Handler<Publish> for CollectorActor {
-    type Result = bool;
+    type Result = ResponseActFuture<Self, ()>;
 
-    fn handle(&mut self, msg: Publish, ctx: &mut Self::Context) -> Self::Result {
-        self.collectors
-            .iter_mut()
-            .for_each(|(factory, collector_ctx)| {
-                if matches!(collector_ctx.state, State::Available(_))
-                    && collector_ctx.queue.is_empty()
-                    || matches!(collector_ctx.state, State::Uninit)
-                {
-                    // collector available & queue empty | lazy init, schedule wake
-                    ctx.notify(Wake(factory.clone()));
+    fn handle(&mut self, msg: Publish, _: &mut Self::Context) -> Self::Result {
+        msg.expand(self.db.clone())
+            .into_actor(self)
+            .map(|msg, act, ctx| {
+                if let Ok(Some(msg)) = msg {
+                    act.collectors
+                        .iter_mut()
+                        .for_each(|(factory, collector_ctx)| {
+                            if matches!(collector_ctx.state, State::Available(_))
+                                && collector_ctx.queue.is_empty()
+                                || matches!(collector_ctx.state, State::Uninit)
+                            {
+                                // collector available & queue empty | lazy init, schedule wake
+                                ctx.notify(Wake(factory.clone()));
+                            }
+                            collector_ctx.queue.push_back(msg.clone());
+                        });
+                } else {
+                    span().in_scope(|| warn!("unable to fetch root metadata"));
                 }
-                collector_ctx.queue.push_back(msg.clone());
-            });
-        true
+            })
+            .boxed_local()
     }
 }
 
@@ -164,7 +214,7 @@ impl Handler<Wake> for CollectorActor {
 
     fn handle(&mut self, msg: Wake, ctx: &mut Self::Context) -> Self::Result {
         enum Branch<'a> {
-            Send(&'a mut Recipient<Publish>),
+            Send(&'a mut Recipient<PublishExpanded>),
             EstablishConnection,
             EarlyWake(Instant),
         }

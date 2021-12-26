@@ -12,9 +12,7 @@ use tokio_amqp::LapinTokioExt;
 use tracing::{error, info_span, Instrument, Span};
 use tracing_actix::ActorInstrument;
 
-use crate::collector::{Collector, CollectorFactory};
-
-use super::Publish;
+use super::{Collector, CollectorFactory, PublishExpanded};
 
 static AMQP_CONNECTION: Lazy<Mutex<Option<Connection>>> = Lazy::new(|| Mutex::new(None));
 
@@ -42,7 +40,7 @@ impl CollectorFactory for AMQPFactory {
         format!("AMQP(uri={}, exchange={})", self.uri, self.exchange)
     }
 
-    async fn build(&self) -> Option<Recipient<Publish>> {
+    async fn build(&self) -> Option<Recipient<PublishExpanded>> {
         async fn _build(uri: &str, exchange: &str, update_conn: bool) -> Result<AMQPActor> {
             let mut guard = AMQP_CONNECTION.lock().await;
             if guard.is_none() || update_conn {
@@ -119,16 +117,16 @@ impl Actor for AMQPActor {
     type Context = Context<Self>;
 }
 
-impl Handler<Publish> for AMQPActor {
+impl Handler<PublishExpanded> for AMQPActor {
     type Result = ResponseActFuture<Self, bool>;
 
-    fn handle(&mut self, msg: Publish, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: PublishExpanded, _ctx: &mut Self::Context) -> Self::Result {
         let payload = serde_json::to_vec(&*msg.data).unwrap(); // TODO error handling
         Box::pin(
             self.channel
                 .basic_publish(
                     self.exchange.as_str(),
-                    msg.topic.as_str(),
+                    &format!("{}.{}", msg.vtuber, msg.topic),
                     BasicPublishOptions::default(),
                     payload,
                     BasicProperties::default(),

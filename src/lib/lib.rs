@@ -21,6 +21,7 @@ mod server;
 pub mod collector;
 mod common;
 pub mod db;
+pub mod manager;
 pub mod scheduler;
 pub mod source;
 #[cfg(test)]

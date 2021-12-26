@@ -143,7 +143,7 @@ mod watchdog {
                     mem::forget(rx);
                     WatchdogActor::start(tx);
                 }
-                System::current().stop()
+                System::current().stop();
             });
         })
         .join()
