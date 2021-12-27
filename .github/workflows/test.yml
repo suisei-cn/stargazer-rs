@@ -22,11 +22,10 @@ jobs:
           toolchain: stable
           default: true
       - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/cargo@v1
-        name: Check Code Format 🔧
+      - uses: mbrobbel/rustfmt-check@master
+        name: Check Code Format (auto fix) 🔧
         with:
-          command: fmt
-          args: -- --check
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions-rs/cargo@v1
         name: Run Clippy Lints 🔨
         with:
