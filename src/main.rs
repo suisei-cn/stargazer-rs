@@ -38,7 +38,7 @@ struct Opts {
 #[get("/status")]
 async fn status(ctx: web::Data<InstanceContext>) -> impl Responder {
     // evict outdated tasks
-    ctx.send::<ScheduleActor<BililiveActor>, _>(&UpdateAll::new(true))
+    ctx.send::<ScheduleActor<BililiveActor>, _>(&UpdateAll { evict: true })
         .unwrap()
         .await
         .unwrap();

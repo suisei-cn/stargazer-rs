@@ -3,7 +3,6 @@ use std::ops::Deref;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use derive_new::new;
 use mongodb::bson::oid::ObjectId;
 pub use mongodb::bson::{doc, Document};
 pub use mongodb::error::Result as DBResult;
@@ -106,11 +105,18 @@ impl DBOperation for DBRefDelOp<'_> {
     }
 }
 
-#[derive(new)]
 pub struct Coll<T> {
     coll: Collection<Document>,
-    #[new(default)]
     _marker: PhantomData<T>,
+}
+
+impl<T> Coll<T> {
+    pub fn new(coll: Collection<Document>) -> Self {
+        Self {
+            coll,
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<T> Deref for Coll<T> {

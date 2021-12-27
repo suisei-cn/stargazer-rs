@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use derive_new::new;
 use erased_serde::private::serde::Serialize;
 use mongodb::bson;
 use mongodb::bson::doc;
@@ -11,9 +10,9 @@ use crate::db::{CollOperation, Collection, DBRef, DBResult, Document};
 
 use super::models::Vtuber;
 
-#[derive(Debug, new)]
+#[derive(Debug)]
 pub struct GetVtuberOp {
-    name: String,
+    pub name: String,
 }
 
 #[async_trait]
@@ -28,9 +27,9 @@ impl CollOperation for GetVtuberOp {
     }
 }
 
-#[derive(Debug, new)]
+#[derive(Debug)]
 pub struct CreateVtuberOp {
-    name: String,
+    pub name: String,
 }
 
 #[async_trait]
@@ -55,9 +54,9 @@ impl CollOperation for CreateVtuberOp {
     }
 }
 
-#[derive(Debug, new)]
+#[derive(Debug)]
 pub struct DeleteVtuberOp {
-    name: String,
+    pub name: String,
 }
 
 #[async_trait]
@@ -75,8 +74,8 @@ impl CollOperation for DeleteVtuberOp {
     }
 }
 
-#[derive(Debug, new)]
-pub struct CreateFieldOp<T>(T);
+#[derive(Debug)]
+pub struct CreateFieldOp<T>(pub T);
 
 #[async_trait]
 impl<T> CollOperation for CreateFieldOp<T>
@@ -96,11 +95,21 @@ where
     }
 }
 
-#[derive(Debug, new)]
+#[derive(Debug)]
 pub struct LinkRefOp {
     name: String,
     field: &'static str,
     db_ref: Option<DBRef>,
+}
+
+impl LinkRefOp {
+    pub fn new(name: String, field: &'static str, db_ref: Option<DBRef>) -> Self {
+        Self {
+            name,
+            field,
+            db_ref,
+        }
+    }
 }
 
 #[async_trait]

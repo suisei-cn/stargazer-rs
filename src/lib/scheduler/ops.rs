@@ -3,7 +3,6 @@ use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use bson::serde_helpers::uuid_as_binary;
-use derive_new::new;
 use futures::{StreamExt, TryStreamExt};
 use mongodb::bson::{self, bson, doc, Document};
 use mongodb::error::Result as DBResult;
@@ -19,9 +18,9 @@ use crate::utils::timestamp;
 
 use super::models::{SchedulerMeta, TaskInfo};
 
-#[derive(Debug, Copy, Clone, new)]
+#[derive(Debug, Copy, Clone)]
 pub struct CheckOwnershipOp {
-    info: TaskInfo,
+    pub info: TaskInfo,
 }
 
 #[async_trait]
@@ -39,10 +38,10 @@ impl CollOperation for CheckOwnershipOp {
     }
 }
 
-#[derive(Debug, Clone, new)]
+#[derive(Debug, Clone)]
 pub struct UpdateEntryOp<T> {
-    info: TaskInfo,
-    body: Option<T>,
+    pub info: TaskInfo,
+    pub body: Option<T>,
 }
 
 #[async_trait]
@@ -106,9 +105,9 @@ impl Default for ScheduleMode {
     }
 }
 
-#[derive(Debug, Clone, new)]
+#[derive(Debug, Clone)]
 pub struct GetAllTasksCount {
-    base_query: Document,
+    pub base_query: Document,
 }
 
 #[async_trait]
@@ -125,11 +124,11 @@ impl CollOperation for GetAllTasksCount {
     }
 }
 
-#[derive(Debug, Clone, new)]
+#[derive(Debug, Clone)]
 pub struct GetWorkerInfoOp {
-    base_query: Document,
-    since_ts: i64,
-    parent_id: Uuid,
+    pub base_query: Document,
+    pub since_ts: i64,
+    pub parent_id: Uuid,
 }
 
 #[async_trait]
@@ -163,11 +162,11 @@ impl CollOperation for GetWorkerInfoOp {
     }
 }
 
-#[derive(Debug, Clone, new)]
+#[derive(Debug, Clone)]
 pub struct GetTasksOnWorkerOp {
-    base_query: Document,
-    since_ts: i64,
-    worker: Uuid,
+    pub base_query: Document,
+    pub since_ts: i64,
+    pub worker: Uuid,
 }
 
 #[async_trait]
@@ -265,12 +264,18 @@ impl<T> ScheduleOp<T> {
         &self,
         collection: &Collection<Document>,
     ) -> DBResult<ScheduleResult<Document>> {
-        let entries_count = GetAllTasksCount::new(self.query.clone())
-            .execute(collection)
-            .await?;
-        let workers = GetWorkerInfoOp::new(self.query.clone(), self.since_ts, self.parent_meta.id)
-            .execute(collection)
-            .await?;
+        let entries_count = GetAllTasksCount {
+            base_query: self.query.clone(),
+        }
+        .execute(collection)
+        .await?;
+        let workers = GetWorkerInfoOp {
+            base_query: self.query.clone(),
+            since_ts: self.since_ts,
+            parent_id: self.parent_meta.id,
+        }
+        .execute(collection)
+        .await?;
 
         // allowed entries per worker is [expected, expected+1].
         let self_count = self.parent_meta.actor_count as u64;
@@ -296,10 +301,13 @@ impl<T> ScheduleOp<T> {
         };
 
         Ok(if let Some(victim_worker) = victim_worker {
-            let tasks =
-                GetTasksOnWorkerOp::new(self.query.clone(), self.since_ts, victim_worker.id)
-                    .execute(collection)
-                    .await?;
+            let tasks = GetTasksOnWorkerOp {
+                base_query: self.query.clone(),
+                since_ts: self.since_ts,
+                worker: victim_worker.id,
+            }
+            .execute(collection)
+            .await?;
 
             if tasks.len() as u64 > threshold {
                 info!("steal one entry");

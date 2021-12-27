@@ -26,10 +26,12 @@ where
     HLabelledMap<LO>: DeserializeOwned,
     HLabelledMap<LD>: Serialize,
 {
-    let vtuber = GetVtuberOp::new(name.into_inner())
-        .execute(&*coll.into_inner())
-        .await?
-        .ok_or(CrudError::MissingVtuber)?;
+    let vtuber = GetVtuberOp {
+        name: name.into_inner(),
+    }
+    .execute(&*coll.into_inner())
+    .await?
+    .ok_or(CrudError::MissingVtuber)?;
     let flatten = vtuber.flatten::<L::OptionHList>(&*db.into_inner()).await?;
     let wrapped = flatten.fields.0.map(Poly(OptionLiftF(IntoDisplay)));
     Ok(Json(HLabelledMap(wrapped)))
@@ -44,7 +46,7 @@ pub async fn delete(
     let coll = &*coll.into_inner();
     let db = &*db.into_inner();
 
-    let vtuber = GetVtuberOp::new(name.clone())
+    let vtuber = GetVtuberOp { name: name.clone() }
         .execute(coll)
         .await?
         .ok_or(CrudError::MissingVtuber)?;
@@ -65,7 +67,7 @@ pub async fn delete(
     // Ok(false) are caused by missing refs.
     .and_then(|e| e.true_or(CrudError::Inconsistency))?;
 
-    DeleteVtuberOp::new(name)
+    DeleteVtuberOp { name }
         .execute(coll)
         .await?
         .true_or(CrudError::Inconsistency)?;
@@ -77,8 +79,6 @@ pub async fn create(
     name: String,
     coll: Data<Collection<Vtuber>>,
 ) -> Result<HttpResponse, CrudError> {
-    CreateVtuberOp::new(name)
-        .execute(&*coll.into_inner())
-        .await?;
+    CreateVtuberOp { name }.execute(&*coll.into_inner()).await?;
     Ok(HttpResponse::NoContent().finish())
 }

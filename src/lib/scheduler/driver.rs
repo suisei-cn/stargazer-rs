@@ -2,7 +2,6 @@ use std::mem;
 use std::time::Duration;
 
 use actix::{Actor, Addr, AsyncContext, AtomicResponse, Context, Handler, Message, WrapFuture};
-use derive_new::new;
 use rand::{thread_rng, Rng};
 use tracing::info_span;
 use tracing_actix::ActorInstrument;
@@ -12,11 +11,19 @@ use crate::scheduler::ops::ScheduleMode;
 use crate::scheduler::{ScheduleActor, Task};
 use crate::ScheduleConfig;
 
-#[derive(Debug, new)]
+#[derive(Debug)]
 pub struct ScheduleDriverActor<T: Task> {
     config: ScheduleConfig,
-    #[new(default)]
     addrs: Vec<Addr<ScheduleActor<T>>>,
+}
+
+impl<T: Task> ScheduleDriverActor<T> {
+    pub fn new(config: ScheduleConfig) -> Self {
+        Self {
+            config,
+            addrs: vec![],
+        }
+    }
 }
 
 impl_stop_on_panic!(ScheduleDriverActor<T: Task>);
@@ -25,9 +32,9 @@ impl_stop_on_panic!(ScheduleDriverActor<T: Task>);
 #[rtype("()")]
 pub struct ScheduleAll(ScheduleMode);
 
-#[derive(Debug, Clone, Message, new)]
+#[derive(Debug, Clone, Message)]
 #[rtype("()")]
-pub struct RegisterScheduler<T: Task>(Addr<ScheduleActor<T>>);
+pub struct RegisterScheduler<T: Task>(pub Addr<ScheduleActor<T>>);
 
 impl<T: Task> Actor for ScheduleDriverActor<T> {
     type Context = Context<Self>;
@@ -87,7 +94,7 @@ where
     let mut new_addrs = vec![];
     for addr in addrs {
         if mode != ScheduleMode::OutdatedOnly {
-            addr.send(UpdateAll::new(true))
+            addr.send(UpdateAll { evict: true })
                 .await
                 .expect("unable to send msg to scheduler");
         }

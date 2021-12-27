@@ -90,7 +90,7 @@ where
     ///
     /// F: `instance_id` -> (`ArbiterContext`, `HttpServices`)
     pub fn new(factory: F) -> Self {
-        let ctx = InstanceContext::new();
+        let ctx = InstanceContext::default();
         Self {
             factory,
             workers: num_cpus::get(),
@@ -121,7 +121,7 @@ where
     ///
     /// Returns `std::io::Error` if error occur when binding the port.
     pub fn run(self, mode: ServerMode) -> std::io::Result<ServerHandler> {
-        let instance_id = self.instance_ctx.id();
+        let instance_id = self.instance_ctx.id;
         let instance_ctx = Arc::new(self.instance_ctx);
         let factory = self.factory;
 
@@ -167,7 +167,7 @@ where
                 .bind(port)?
                 .run();
 
-                KillerActor::from_registry().do_send(RegisterHttpServer::new(srv.handle()));
+                KillerActor::from_registry().do_send(RegisterHttpServer(srv.handle()));
                 Ok(ServerHandler::HTTP(srv))
             }
         }

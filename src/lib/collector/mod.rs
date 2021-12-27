@@ -29,7 +29,7 @@ pub mod debug;
 mod tests;
 
 fn span() -> Span {
-    let arb_id = ArbiterContext::with(ArbiterContext::arbiter_id);
+    let arb_id = ArbiterContext::with(|ctx| ctx.arbiter_id);
     info_span!("collector", arb=?arb_id)
 }
 

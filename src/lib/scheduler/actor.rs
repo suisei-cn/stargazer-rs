@@ -8,7 +8,6 @@ use actix::{
 };
 use actix_signal::{AddrSignalExt, SignalHandler};
 use futures::FutureExt;
-use getset::{CopyGetters, Getters};
 use itertools::Itertools;
 use serde::Serialize;
 use tracing::{info, info_span, warn};
@@ -29,12 +28,10 @@ use super::ops::{CheckOwnershipOp, ScheduleMode, UpdateEntryOp};
 use super::Task;
 use super::TaskInfo;
 
-#[derive(Debug, Clone, Getters, CopyGetters)]
+#[derive(Debug, Clone)]
 pub struct ScheduleContext<T: Actor + SignalHandler> {
-    #[getset(get_copy = "pub")]
-    id: Uuid,
-    #[getset(get = "pub")]
-    actors: HashMap<TaskInfo, Addr<T>>,
+    pub id: Uuid,
+    pub actors: HashMap<TaskInfo, Addr<T>>,
 }
 
 impl<T: Actor + SignalHandler> ScheduleContext<T> {
@@ -140,7 +137,7 @@ where
 
     fn handle(&mut self, msg: CheckOwnership, _ctx: &mut Self::Context) -> Self::Result {
         let collection = self.collection.clone();
-        let op = CheckOwnershipOp::new(msg.info);
+        let op = CheckOwnershipOp { info: msg.info };
         Box::pin(async move { op.execute(&collection).await })
     }
 }
@@ -154,7 +151,10 @@ where
 
     fn handle(&mut self, msg: UpdateEntry<U>, _ctx: &mut Self::Context) -> Self::Result {
         let collection = self.collection.clone();
-        let op = UpdateEntryOp::new(msg.info, msg.body);
+        let op = UpdateEntryOp {
+            info: msg.info,
+            body: msg.body,
+        };
         AtomicResponse::new(Box::pin(
             async move { op.execute(&collection).await }.into_actor(self),
         ))
@@ -173,7 +173,15 @@ where
             .ctx
             .actors
             .iter()
-            .map(|(info, addr)| (UpdateEntryOp::<()>::new(*info, None), addr.clone()))
+            .map(|(info, addr)| {
+                (
+                    UpdateEntryOp::<()> {
+                        info: *info,
+                        body: None,
+                    },
+                    addr.clone(),
+                )
+            })
             .map(move |(op, addr)| {
                 let collection = collection.clone();
                 async move {
@@ -250,13 +258,17 @@ where
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        self.driver.do_send(RegisterScheduler::new(ctx.address()));
+        self.driver.do_send(RegisterScheduler(ctx.address()));
         ctx.run_interval(self.config.max_interval / 2, |act, ctx| {
             ctx.spawn(
                 ctx.address()
                     .send(TriggerGC)
                     .into_actor(act)
-                    .then(|_, act, ctx| ctx.address().send(UpdateAll::new(true)).into_actor(act))
+                    .then(|_, act, ctx| {
+                        ctx.address()
+                            .send(UpdateAll { evict: true })
+                            .into_actor(act)
+                    })
                     .map(|_, _, _| ()),
             );
         });

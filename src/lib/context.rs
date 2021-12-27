@@ -4,8 +4,6 @@ use std::sync::Arc;
 
 use actix::dev::ToEnvelope;
 use actix::{Actor, Addr, Handler, MailboxError, Message};
-use derive_new::new;
-use getset::CopyGetters;
 use itertools::Itertools;
 use once_cell::unsync::OnceCell;
 use parking_lot::RwLock;
@@ -27,15 +25,21 @@ pub trait MessageTarget: Copy + Send {
     type Addr: TypeEq<Other = Addr<Self::Actor>>;
 }
 
-#[derive(Debug, Clone, new, CopyGetters)]
+#[derive(Debug, Clone)]
 pub struct ArbiterContext {
-    #[getset(get_copy = "pub")]
-    instance_id: Uuid,
-    #[new(value = "Uuid::new_v4()")]
-    #[getset(get_copy = "pub")]
-    arbiter_id: Uuid,
-    #[new(default)]
+    pub instance_id: Uuid,
+    pub arbiter_id: Uuid,
     addrs: HashMap<TypeId, Arc<dyn Any + Send + Sync>>,
+}
+
+impl ArbiterContext {
+    pub fn new(instance_id: Uuid) -> Self {
+        Self {
+            instance_id,
+            arbiter_id: Uuid::new_v4(),
+            addrs: HashMap::new(),
+        }
+    }
 }
 
 impl ArbiterContext {
@@ -107,13 +111,19 @@ impl ArbiterContext {
     }
 }
 
-#[derive(Debug, new, CopyGetters)]
+#[derive(Debug)]
 pub struct InstanceContext {
-    #[new(value = "Uuid::new_v4()")]
-    #[getset(get_copy = "pub")]
-    id: Uuid,
-    #[new(value = "RwLock::new(vec![])")]
+    pub id: Uuid,
     arbiters: RwLock<Vec<ArbiterContext>>,
+}
+
+impl Default for InstanceContext {
+    fn default() -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            arbiters: RwLock::default(),
+        }
+    }
 }
 
 impl InstanceContext {

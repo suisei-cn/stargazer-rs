@@ -2,14 +2,19 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use actix::{Actor, Addr, Message, ResponseFuture};
-use derive_new::new;
 
 use crate::db::DBResult;
 use crate::scheduler::models::TaskInfo;
 use crate::scheduler::ops::ScheduleMode;
 
-#[derive(Debug, Copy, Clone, new)]
-pub struct TrySchedule<T>(pub(crate) ScheduleMode, #[new(default)] PhantomData<T>);
+#[derive(Debug, Copy, Clone)]
+pub struct TrySchedule<T>(pub(crate) ScheduleMode, PhantomData<T>);
+
+impl<T> TrySchedule<T> {
+    pub fn new(field0: ScheduleMode) -> Self {
+        Self(field0, PhantomData)
+    }
+}
 
 unsafe impl<T> Send for TrySchedule<T> {}
 
@@ -19,7 +24,7 @@ impl<T: Actor> Message for TrySchedule<T> {
 
 /// Check whether this worker still owns the resource.
 /// Returns `false` if the resource bound to this worker is replaced by another worker or deleted
-#[derive(Debug, Copy, Clone, Message, new)]
+#[derive(Debug, Copy, Clone, Message)]
 #[rtype("DBResult<bool>")]
 pub struct CheckOwnership {
     pub info: TaskInfo,
@@ -49,7 +54,7 @@ impl UpdateEntry<()> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Message, new)]
+#[derive(Debug, Copy, Clone, Message)]
 #[rtype("()")]
 pub struct UpdateAll {
     pub evict: bool,
@@ -63,17 +68,27 @@ pub struct GetId;
 #[rtype("()")]
 pub struct TriggerGC;
 
-#[derive(Debug, Copy, Clone, new)]
+#[derive(Debug, Copy, Clone)]
 pub struct ActorsIter<A, F, Output>
 where
     F: FnOnce(HashMap<TaskInfo, Addr<A>>) -> ResponseFuture<Output>,
     A: Actor,
 {
     inner: F,
-    #[new(default)]
-    __marker_1: PhantomData<A>,
-    #[new(default)]
-    __marker_2: PhantomData<Output>,
+    __marker: PhantomData<(A, Output)>,
+}
+
+impl<A, F, Output> ActorsIter<A, F, Output>
+where
+    F: FnOnce(HashMap<TaskInfo, Addr<A>>) -> ResponseFuture<Output>,
+    A: Actor,
+{
+    pub fn new(inner: F) -> Self {
+        Self {
+            inner,
+            __marker: PhantomData,
+        }
+    }
 }
 
 impl<A, F, Output> Message for ActorsIter<A, F, Output>

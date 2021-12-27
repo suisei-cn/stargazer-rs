@@ -1,15 +1,14 @@
 use actix::{Actor, Context, Handler, Message, Supervised, System, SystemService};
 use actix_web::dev::ServerHandle;
-use derive_new::new;
 
-#[derive(Debug, Clone, Message, new)]
+#[derive(Debug, Clone, Message)]
 #[rtype("()")]
-pub struct RegisterHttpServer(ServerHandle);
+pub struct RegisterHttpServer(pub ServerHandle);
 
-#[derive(Debug, Copy, Clone, Message, new)]
+#[derive(Debug, Copy, Clone, Message)]
 #[rtype("()")]
 pub struct Kill {
-    graceful: bool,
+    pub graceful: bool,
 }
 
 #[derive(Debug, Default)]
@@ -21,7 +20,7 @@ impl KillerActor {
     }
 
     pub fn kill(graceful: bool) {
-        Self::from_registry().do_send(Kill::new(graceful));
+        Self::from_registry().do_send(Kill { graceful });
     }
 }
 

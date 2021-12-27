@@ -21,10 +21,12 @@ async fn get<T: Task>(
     coll: Data<Collection<Vtuber>>,
     db: Data<Database>,
 ) -> Result<String, CrudError> {
-    let vtuber = GetVtuberOp::new(name.into_inner())
-        .execute(&*coll.into_inner())
-        .await?
-        .ok_or(CrudError::MissingVtuber)?;
+    let vtuber = GetVtuberOp {
+        name: name.into_inner(),
+    }
+    .execute(&*coll.into_inner())
+    .await?
+    .ok_or(CrudError::MissingVtuber)?;
     let db_ref = vtuber
         .fields
         .get(T::Entry::KEY)
@@ -52,7 +54,7 @@ async fn put<T: Task>(
         source: Box::new(e),
     })?;
 
-    let vtuber = GetVtuberOp::new(name.clone())
+    let vtuber = GetVtuberOp { name: name.clone() }
         .execute(coll)
         .await?
         .ok_or(CrudError::MissingVtuber)?;
@@ -73,7 +75,7 @@ async fn put<T: Task>(
             .map(|_| HttpResponse::NoContent().finish())
             .ok_or(CrudError::Inconsistency)
     } else {
-        let db_ref = CreateFieldOp::new(payload)
+        let db_ref = CreateFieldOp(payload)
             .execute(&db.collection::<T::Entry>(T::Entry::KEY))
             .await?;
         LinkRefOp::new(name, T::Entry::KEY, Some(db_ref))
@@ -92,7 +94,7 @@ async fn delete<T: Task>(
     let coll = &*coll.into_inner();
     let db = &*db.into_inner();
 
-    let vtuber = GetVtuberOp::new(name.clone())
+    let vtuber = GetVtuberOp { name: name.clone() }
         .execute(coll)
         .await?
         .ok_or(CrudError::MissingVtuber)?;
