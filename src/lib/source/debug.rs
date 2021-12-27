@@ -10,7 +10,7 @@ use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, info_span, Span};
 
-use crate::db::{Coll, Collection, Document};
+use crate::db::{Coll, Document};
 use crate::scheduler::{Entry, Task, TaskInfo};
 use crate::utils::Scheduler;
 use crate::ScheduleConfig;
@@ -80,7 +80,6 @@ impl Task for DebugActor {
         ctor: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
-        _collection: Collection<Document>,
     ) -> Self {
         Self {
             entry,

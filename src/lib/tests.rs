@@ -119,7 +119,7 @@ mod utils {
     use serde::{Deserialize, Serialize};
     use tracing::Span;
 
-    use crate::db::{Collection, Document};
+    use crate::db::Document;
     use crate::scheduler::{Entry, Task, TaskInfo};
     use crate::utils::Scheduler;
 
@@ -178,7 +178,6 @@ mod utils {
             _: Self::Ctor,
             _: Scheduler<Self>,
             _: TaskInfo,
-            _: Collection<Document>,
         ) -> Self {
             unimplemented!()
         }

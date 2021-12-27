@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, info_span, Span};
 use tracing_actix::ActorInstrument;
 
-use crate::db::{Coll, Collection, Document};
+use crate::db::{Coll, Document};
 use crate::scheduler::{Entry, Task, TaskInfo};
 use crate::source::ToCollector;
 use crate::utils::Scheduler;
@@ -54,7 +54,6 @@ impl Display for BililiveEntry {
 pub struct BililiveActor {
     entry: Entry<BililiveEntry>,
     schedule_config: ScheduleConfig,
-    collection: Collection<Document>,
     info: TaskInfo,
     scheduler: Scheduler<Self>,
 }
@@ -139,12 +138,10 @@ impl Task for BililiveActor {
         ctor: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
-        collection: Collection<Document>,
     ) -> Self {
         Self {
             entry,
             schedule_config: ctor,
-            collection,
             info,
             scheduler,
         }

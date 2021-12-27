@@ -17,9 +17,10 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_amqp::LapinTokioExt;
 use tracing_test::traced_test;
 
-use super::{CollectorFactory, PublishExpanded};
 use crate::collector::amqp::AMQPFactory;
 use crate::collector::debug::DebugCollectorFactory;
+
+use super::{CollectorFactory, PublishExpanded};
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 struct TestMsg {
@@ -48,7 +49,7 @@ async fn must_debug_collector() {
             .send(PublishExpanded {
                 vtuber: String::from("v"),
                 topic: String::from("blabla"),
-                data: Arc::new(msg.clone())
+                data: Arc::new(msg.clone()),
             })
             .await
             .expect("mailbox error"),
@@ -172,7 +173,7 @@ async fn must_amqp_publish(uri: &'static str) {
             .send(PublishExpanded {
                 vtuber: String::new(),
                 topic: String::from("blabla"),
-                data: Arc::new(msg.clone())
+                data: Arc::new(msg.clone()),
             })
             .await
             .expect("mailbox error"),

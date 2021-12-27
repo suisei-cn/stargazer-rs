@@ -9,7 +9,7 @@ use tracing::Span;
 pub use actor::ScheduleActor;
 pub use models::TaskInfo;
 
-use crate::db::{Collection, DBRef, Document};
+use crate::db::{DBRef, Document};
 use crate::utils::{FromStrE, Scheduler};
 
 pub mod actor;
@@ -59,7 +59,6 @@ pub trait Task: TaskFieldGetter + Actor<Context = Context<Self>> + SignalHandler
         ctor: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
-        collection: Collection<Document>,
     ) -> Self;
     fn span(&self) -> Span;
 }

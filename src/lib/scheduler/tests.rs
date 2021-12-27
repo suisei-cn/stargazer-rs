@@ -9,7 +9,7 @@ use hmap_serde::Labelled;
 use serde::{Deserialize, Serialize};
 use tracing::{info_span, Span};
 
-use crate::db::{Collection, Document};
+use crate::db::Document;
 use crate::scheduler::{Entry, Task, TaskFieldGetter};
 use crate::utils::Scheduler;
 
@@ -18,7 +18,6 @@ use super::models::TaskInfo;
 #[derive(Debug, Clone, SignalHandler)]
 struct DummyTask {
     info: TaskInfo,
-    collection: Collection<Document>,
     scheduler: Scheduler<Self>,
 }
 
@@ -62,7 +61,6 @@ impl Task for DummyTask {
         _ctor: Self::Ctor,
         _scheduler: Scheduler<Self>,
         _info: TaskInfo,
-        _collection: Collection<Document>,
     ) -> Self {
         unreachable!()
     }

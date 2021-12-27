@@ -112,13 +112,7 @@ where
                     maybe_res.map(|(info, entry)| {
                         // We've got an entry.
                         info!("entry stolen: {:?}", entry);
-                        let actor = T::construct(
-                            entry,
-                            (*ctor_builder)(),
-                            scheduler_addr,
-                            info,
-                            collection,
-                        );
+                        let actor = T::construct(entry, (*ctor_builder)(), scheduler_addr, info);
                         let addr = actor.start();
                         (info, addr)
                     })

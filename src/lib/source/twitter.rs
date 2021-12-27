@@ -18,7 +18,7 @@ use tracing::Span;
 use tracing::{error, info, info_span, warn};
 use tracing_actix::ActorInstrument;
 
-use crate::db::{Coll, Collection, Document};
+use crate::db::{Coll, Document};
 use crate::scheduler::messages::UpdateEntry;
 use crate::scheduler::{Entry, Task, TaskInfo};
 use crate::source::ToCollector;
@@ -70,7 +70,6 @@ pub struct TwitterActor {
     token: Token,
     entry: Entry<TwitterEntry>,
     schedule_config: ScheduleConfig,
-    collection: Collection<Document>,
     info: TaskInfo,
     scheduler: Scheduler<Self>,
 }
@@ -176,13 +175,11 @@ impl Task for TwitterActor {
         ctor: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
-        collection: Collection<Document>,
     ) -> Self {
         Self {
             token: Token::Bearer(ctor.token),
             entry,
             schedule_config: ctor.schedule_config,
-            collection,
             info,
             scheduler,
         }
