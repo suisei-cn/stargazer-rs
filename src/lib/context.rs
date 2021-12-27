@@ -207,9 +207,9 @@ mod tests {
 
     #[actix::test]
     async fn must_instance_send() {
-        let inst = InstanceContext::new();
-        let arb_1 = ArbiterContext::new(inst.id()).register_addr(Echo::default().start());
-        let arb_2 = ArbiterContext::new(inst.id()).register_addr(Echo2::default().start());
+        let inst = InstanceContext::default();
+        let arb_1 = ArbiterContext::new(inst.id).register_addr(Echo::default().start());
+        let arb_2 = ArbiterContext::new(inst.id).register_addr(Echo2::default().start());
         inst.register(arb_1);
         inst.register(arb_2);
         assert!(
@@ -217,13 +217,13 @@ mod tests {
             "unexpected addr"
         );
 
-        let inst = InstanceContext::new();
-        let arb_1 = ArbiterContext::new(inst.id())
+        let inst = InstanceContext::default();
+        let arb_1 = ArbiterContext::new(inst.id)
             .register_addr(Echo::default().start())
-            .register_addr(Adder::new(0).start());
-        let arb_2 = ArbiterContext::new(inst.id())
+            .register_addr(Adder(0).start());
+        let arb_2 = ArbiterContext::new(inst.id)
             .register_addr(Echo::default().start())
-            .register_addr(Adder::new(1).start());
+            .register_addr(Adder(1).start());
         inst.register(arb_1);
         inst.register(arb_2);
         let ans = inst
