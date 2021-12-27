@@ -11,7 +11,7 @@ use crate::scheduler::ops::ScheduleMode;
 pub struct TrySchedule<T>(pub(crate) ScheduleMode, PhantomData<T>);
 
 impl<T> TrySchedule<T> {
-    pub fn new(field0: ScheduleMode) -> Self {
+    pub const fn new(field0: ScheduleMode) -> Self {
         Self(field0, PhantomData)
     }
 }

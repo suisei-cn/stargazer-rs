@@ -103,7 +103,7 @@ pub struct LinkRefOp {
 }
 
 impl LinkRefOp {
-    pub fn new(name: String, field: &'static str, db_ref: Option<DBRef>) -> Self {
+    pub const fn new(name: String, field: &'static str, db_ref: Option<DBRef>) -> Self {
         Self {
             name,
             field,

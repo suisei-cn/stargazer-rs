@@ -11,7 +11,7 @@ pub struct ArbiterHandler {
 }
 
 impl ArbiterHandler {
-    pub fn new(stop_count: usize, rx: UnboundedReceiver<()>) -> Self {
+    pub const fn new(stop_count: usize, rx: UnboundedReceiver<()>) -> Self {
         Self { stop_count, rx }
     }
 }

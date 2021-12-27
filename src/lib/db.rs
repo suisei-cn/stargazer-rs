@@ -111,7 +111,7 @@ pub struct Coll<T> {
 }
 
 impl<T> Coll<T> {
-    pub fn new(coll: Collection<Document>) -> Self {
+    pub const fn new(coll: Collection<Document>) -> Self {
         Self {
             coll,
             _marker: PhantomData,

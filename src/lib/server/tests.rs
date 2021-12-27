@@ -81,7 +81,7 @@ mod killer {
                 });
 
                 let addr = KillerActor::from_registry();
-                addr.do_send(Kill{ graceful: true });
+                addr.do_send(Kill { graceful: true });
             });
             sys.run().unwrap(); // join system
         }
