@@ -61,7 +61,7 @@ impl<T: Serialize + Send> CollOperation for UpdateEntryOp<T> {
 
         Ok(collection
             .update_one(
-                doc! {"_id": self.info.doc_id, "uuid": self.info.uuid.to_string()},
+                doc! {"_id": self.info.doc_id, "uuid": self.info.uuid},
                 doc! {"$set": body},
                 None,
             )
