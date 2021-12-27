@@ -13,7 +13,6 @@ use tracing::{debug, info, info_span, Span};
 use crate::db::{Coll, Document};
 use crate::scheduler::{Entry, Task, TaskInfo};
 use crate::utils::Scheduler;
-use crate::ScheduleConfig;
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct DebugEntry {
@@ -43,7 +42,6 @@ impl Display for DebugEntry {
 #[derive(Debug, Clone, SignalHandler)]
 pub struct DebugActor {
     entry: Entry<DebugEntry>,
-    schedule_config: ScheduleConfig,
     info: TaskInfo,
     scheduler: Scheduler<Self>,
 }
@@ -69,7 +67,7 @@ impl Actor for DebugActor {
 
 impl Task for DebugActor {
     type Entry = DebugEntry;
-    type Ctor = ScheduleConfig;
+    type Ctor = ();
 
     fn query() -> Document {
         Document::new()
@@ -77,13 +75,12 @@ impl Task for DebugActor {
 
     fn construct(
         entry: Entry<Self::Entry>,
-        ctor: Self::Ctor,
+        _: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
     ) -> Self {
         Self {
             entry,
-            schedule_config: ctor,
             info,
             scheduler,
         }

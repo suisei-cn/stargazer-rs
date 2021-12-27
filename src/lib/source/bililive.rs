@@ -21,7 +21,6 @@ use crate::db::{Coll, Document};
 use crate::scheduler::{Entry, Task, TaskInfo};
 use crate::source::ToCollector;
 use crate::utils::Scheduler;
-use crate::ScheduleConfig;
 
 type BoxedError = Box<dyn Error>;
 
@@ -53,7 +52,6 @@ impl Display for BililiveEntry {
 #[derive(Debug, Clone, SignalHandler)]
 pub struct BililiveActor {
     entry: Entry<BililiveEntry>,
-    schedule_config: ScheduleConfig,
     info: TaskInfo,
     scheduler: Scheduler<Self>,
 }
@@ -127,7 +125,7 @@ impl Actor for BililiveActor {
 
 impl Task for BililiveActor {
     type Entry = BililiveEntry;
-    type Ctor = ScheduleConfig;
+    type Ctor = ();
 
     fn query() -> Document {
         Document::new()
@@ -135,13 +133,12 @@ impl Task for BililiveActor {
 
     fn construct(
         entry: Entry<Self::Entry>,
-        ctor: Self::Ctor,
+        _: Self::Ctor,
         scheduler: Scheduler<Self>,
         info: TaskInfo,
     ) -> Self {
         Self {
             entry,
-            schedule_config: ctor,
             info,
             scheduler,
         }
