@@ -100,7 +100,7 @@ async fn main() {
             Some(
                 ScheduleActor::builder()
                     .db(&database)
-                    .ctor_builder(||())
+                    .ctor_builder(|| ())
                     .config(sched_config)
                     .driver(bililive_driver.clone())
                     .build(),
