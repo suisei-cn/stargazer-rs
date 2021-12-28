@@ -7,6 +7,9 @@ use actix_web::web::Data;
 use actix_web::{get, web, Responder};
 use clap::Parser;
 use itertools::Itertools;
+use mongodb::bson::doc;
+use mongodb::options::IndexOptions;
+use mongodb::IndexModel;
 
 use stargazer_lib::collector::amqp::AMQPFactory;
 use stargazer_lib::collector::debug::DebugCollectorFactory;
@@ -80,6 +83,16 @@ async fn main() {
     let coll_debug: Collection<Document> = database.collection("debug");
 
     let coll_vtuber: Collection<Vtuber> = database.collection("vtuber");
+    coll_vtuber
+        .create_index(
+            IndexModel::builder()
+                .keys(doc! {"name": 1})
+                .options(IndexOptions::builder().unique(true).build())
+                .build(),
+            None,
+        )
+        .await
+        .expect("unable to create index");
 
     let arc_coll_bililive: Arc<Coll<BililiveColl>> = Arc::new(Coll::new(coll_bililive.clone()));
     let arc_coll_twitter: Arc<Coll<TwitterColl>> = Arc::new(Coll::new(coll_twitter.clone()));

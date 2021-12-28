@@ -7,6 +7,7 @@ use mongodb::bson::doc;
 use mongodb::bson::oid::ObjectId;
 
 use crate::db::{CollOperation, Collection, DBRef, DBResult, Document};
+use crate::utils::DBErrorExt;
 
 use super::models::Vtuber;
 
@@ -34,7 +35,7 @@ pub struct CreateVtuberOp {
 
 #[async_trait]
 impl CollOperation for CreateVtuberOp {
-    type Result = ();
+    type Result = bool;
     type Item = Vtuber;
 
     const DESC: &'static str = "CreateVtuber";
@@ -50,7 +51,8 @@ impl CollOperation for CreateVtuberOp {
                 None,
             )
             .await
-            .map(|_| ())
+            .map(|_| true)
+            .or_else(|e| (e.write() == Some(11000)).then(|| false).ok_or(e))
     }
 }
 

@@ -5,6 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use actix::Addr;
 use actix_rt::task::JoinHandle;
+use mongodb::error::{ErrorKind, WriteFailure};
 
 use crate::scheduler::actor::ScheduleActor;
 
@@ -190,5 +191,18 @@ where
 
     fn from_str_e(s: &str) -> Result<Self, Self::Err> {
         FromStr::from_str(s)
+    }
+}
+
+pub trait DBErrorExt {
+    fn write(&self) -> Option<i32>;
+}
+
+impl DBErrorExt for mongodb::error::Error {
+    fn write(&self) -> Option<i32> {
+        match &*self.kind {
+            ErrorKind::Write(WriteFailure::WriteError(e)) => Some(e.code),
+            _ => None,
+        }
     }
 }

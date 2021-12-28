@@ -79,6 +79,14 @@ pub async fn create(
     name: String,
     coll: Data<Collection<Vtuber>>,
 ) -> Result<HttpResponse, CrudError> {
-    CreateVtuberOp { name }.execute(&*coll.into_inner()).await?;
-    Ok(HttpResponse::NoContent().finish())
+    Ok(
+        if (CreateVtuberOp { name })
+            .execute(&*coll.into_inner())
+            .await?
+        {
+            HttpResponse::NoContent().finish()
+        } else {
+            HttpResponse::Conflict().finish()
+        },
+    )
 }
