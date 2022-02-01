@@ -2395,7 +2395,7 @@ dependencies = [
  "mongodb",
  "num_cpus",
  "once_cell",
- "parking_lot 0.11.2",
+ "parking_lot 0.12.0",
  "pin-project",
  "rand",
  "serde",
