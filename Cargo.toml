@@ -43,7 +43,7 @@ serde_json = "1.0"
 tap = "1.0"
 thiserror = "1.0"
 tokio = { version = "1.16", features = ["rt", "net", "parking_lot", "signal", "sync", "time"] }
-tokio-amqp = { version = "1.0", default-features = false }
+tokio-amqp = { version = "1.1", default-features = false }
 tracing = "0.1"
 tracing-actix = "0.3"
 tracing-subscriber = { version = "0.3", features = ["parking_lot"] }
